@@ -137,7 +137,7 @@ const ITEMS={'Mana Shard':'Catalyst: spell costs 30% less mana','Ember Core':'Ca
 const EL_COL={Fire:'#ff6a3d',Water:'#3da5ff',Ice:'#9ee7ff',Lightning:'#ffe14d',Plant:'#5fd068',Shadow:'#a070ff',Light:'#fff3b0',Poison:'#a6e22e',Lava:'#ff4500',Star:'#ffd700',Moon:'#d8d8ff',Spirit:'#e0b0ff',Wind:'#bdf5d0',Earth:'#b08850',Metal:'#c0c8d0',Sound:'#ff9ad5',Time:'#e8d38a',Space:'#7a6cff',Crystal:'#8ff0ff',Sand:'#e6c47a',Mist:'#cfd8e0',Gravity:'#9b59b6',Bubble:'#a8e0ff',Paper:'#f5f0e0',Thread:'#ff8080',Ash:'#9a9a9a',Glass:'#d0f0ff',Storm:'#6080ff',Bone:'#eee8d0',Ink:'#5050a0'};
 const elc=()=>EL_COL[S.g.el]||'#c9a54a';
 function bar(v,m,c){return`<div class="bar"><i style="width:${Math.max(0,Math.min(100,v/m*100))}%;background:${c}"></i></div>`}
-const SPR={me:["..hhhh..",".hhhhhh.","hhhbhhhh","..ssss..","..eses..","..ssss..",".rrrrrr.","rrrrrrbb",".rrrrrbb",".rrrrrr.","..r..r..",".kk..kk."],
+const SPR={me:["hh......",".hhhh...","..hhhhh.","hhhhhhhh","..sssss.","..ssese.","..sssss.",".rrrrr..",".rrrrbbb",".rrrrbbb","..r..r..",".kk..kk."],
  blob:["..oooo..",".oooooo.","owwoowwo","obwoobwo","oooooooo","oooooooo",".o.oo.o.","o..oo..o"]};
 function spr(c,a,x,y,map,col,s,flip){for(let r=0;r<a.length;r++)for(let q=0;q<8;q++){const ch=a[r][flip?7-q:q];if(ch!=='.'){c.fillStyle=map[ch]||col;c.fillRect(Math.round(x+q*s),Math.round(y+r*s),s,s)}}}
 const T=16,W=320,H=180,keys={};let G=null;
