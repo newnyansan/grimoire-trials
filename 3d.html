@@ -299,13 +299,14 @@ function buildTown(i){const z=ZONES[i],lv=TW[i].lv;if(z.grp)z.base.remove(z.grp)
 function xpBonus(e){return ZONES.some((z,i)=>z.rev&&TW[i].lv>=3&&biome(z.x,z.z)===biome(e.x,e.z))?1.1:1}
 function towersTick(dt){ZONES.forEach((z,i)=>{if(!z.rev||TW[i].lv<3||!z.tower)return;z.tcd=(z.tcd||0)-dt;if(z.tcd>0)return;const e=enemies.find(e=>Math.hypot(e.x-z.x,e.z-z.z)<z.r+16);if(!e)return;z.tcd=1.2;
   const from=new THREE.Vector3(z.tower.x,H(z.tower.x,z.tower.z)+8,z.tower.z),dir=new THREE.Vector3(e.x-from.x,e.y+e.cy-from.y,e.z-from.z).normalize();shoot(from,dir,45,.45,'#ffd27a',false,{dmg:10+S.lv*3,fx:[],dot:false})})}
+function need(n,h,label){return '<li style="color:'+(h>=n?'#7dff9a':'#ff8a8a')+'">'+(h>=n?'✔ ':'✘ ')+n+' '+label+' · you have '+h+(h>=n?'':' (need '+(n-h)+' more)')+'</li>'}
 function closePanel(re){const d=$('tpanel');if(d)d.remove();menuOpen=false;if(re===true)relock()}
 function openTown(i){closePanel();menuOpen=true;document.exitPointerLock();for(const k in keys)keys[k]=0;const z=ZONES[i],lv=TW[i].lv,c=COST[lv+1],m=ZMAT(i),have=S.mats[m]||0,gold=S.gold||0,seal=S.mats['Seal Fragment']||0;
   const can=!!c&&gold>=c.gold&&have>=c.mat&&seal>=(c.seal||0);
   const others=ZONES.map((o,j)=>j!==i&&o.rev&&(TW[j].lv>=1||j===0)?'<button onclick="__town.travel('+j+')">'+o.n+'</button> ':'').join('');
   const d=document.createElement('div');d.id='tpanel';d.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(540px,92vw);background:#1f1c2b;border:2px solid #c9a54a;border-radius:12px;padding:18px;z-index:15';
   d.innerHTML='<h2 style="color:#c9a54a;margin:0 0 6px">'+z.n+'</h2><p>Level: <b>'+TITLES[lv]+'</b> '+'★'.repeat(lv+1)+'☆'.repeat(3-lv)+'</p><p style="color:#b8b0c8;font-size:13px">Unlocked: '+UNLOCK.slice(0,lv+1).join(' · ')+'</p>'+
-   (c?'<p>Upgrade to <b>'+TITLES[lv+1]+'</b>: '+c.gold+' gold (you have '+gold+'), '+c.mat+' '+m+' ('+have+')'+(c.seal?', '+c.seal+' Seal Fragment ('+seal+')':'')+'<br><span style="color:#b8b0c8;font-size:13px">Unlocks '+UNLOCK[lv+1]+'.</span></p><button '+(can?'':'disabled')+' onclick="__town.upgrade('+i+')">Upgrade to '+TITLES[lv+1]+'</button> ':'<p>This settlement is fully developed.</p>')+
+   (c?'<p>Upgrade to <b>'+TITLES[lv+1]+'</b> needs:</p><ul style="margin:4px 0 8px;padding-left:20px">'+need(c.gold,gold,'gold')+need(c.mat,have,m+' (drops in '+BIO[biome(z.x,z.z)].n+')')+(c.seal?need(c.seal,seal,'Seal Fragment (from Champions)'):'')+'</ul><p><span style="color:#b8b0c8;font-size:13px">Unlocks '+UNLOCK[lv+1]+'.</span></p><button '+(can?'':'disabled')+' onclick="__town.upgrade('+i+')">Upgrade to '+TITLES[lv+1]+'</button> ':'<p>This settlement is fully developed.</p>')+
    (lv>=2?'<button onclick="__town.hall()">Guild Hall: grimoire menus</button>':'')+(lv>=1&&others?'<p style="margin:10px 0 4px">Fast travel:</p>'+others:'')+'<p style="margin-top:12px"><button onclick="__town.close()">Close</button></p>';
   document.body.appendChild(d)}
 window.__town={upgrade(i){const lv=TW[i].lv,c=COST[lv+1],m=ZMAT(i);if(!c||(S.gold||0)<c.gold||(S.mats[m]||0)<c.mat||(S.mats['Seal Fragment']||0)<(c.seal||0))return;
