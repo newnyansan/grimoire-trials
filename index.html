@@ -1,0 +1,251 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grimoire Trials</title>
+<style>
+:root{--bg:#14121c;--panel:#1f1c2b;--ink:#ece8f5;--mute:#9a93ad;--acc:#c9a54a;--bad:#d9534f;--good:#4caf7d;--mana:#4a8fd9}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:760px;margin:auto;padding:16px}h1{color:var(--acc);margin:.2em 0}h2{margin:.3em 0}
+.card{background:var(--panel);border-radius:10px;padding:14px;margin:10px 0}
+button{background:#2d2840;color:var(--ink);border:1px solid #453d5e;border-radius:8px;padding:8px 12px;margin:4px;cursor:pointer;font:inherit}
+button:hover:not(:disabled){border-color:var(--acc)}button:disabled{opacity:.4;cursor:default}
+.bar{height:12px;background:#000;border-radius:6px;overflow:hidden;margin:3px 0}.bar>i{display:block;height:100%}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>.card{flex:1;min-width:220px}
+.mute{color:var(--mute);font-size:13px}#log{max-height:160px;overflow:auto;font-size:13px}
+.r1{color:#bbb}.r2{color:#6fcf6f}.r3{color:#5aa9ff}.r4{color:#c77dff}.r5{color:#ffb020}
+.card{position:relative}.foe{font-size:56px;text-align:center;line-height:1.1;transition:transform .2s}
+.shake{animation:sh .35s}@keyframes sh{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.pop{position:absolute;right:16px;top:8px;font-weight:700;font-size:22px;animation:up 1s forwards;pointer-events:none}
+@keyframes up{to{transform:translateY(-40px);opacity:0}}.glow{animation:gl 1.2s infinite alternate}@keyframes gl{to{text-shadow:0 0 14px currentColor}}
+.tag{display:inline-block;background:#3a2f55;border-radius:5px;padding:1px 6px;font-size:12px;margin-left:4px}
+input,select{background:#0e0c14;color:var(--ink);border:1px solid #453d5e;border-radius:6px;padding:6px;font:inherit}
+</style></head><body><main id="app"></main>
+<script>
+// ---------- DATA ----------
+const ELEMENTS={Fire:'bold',Water:'calm',Wind:'free',Earth:'steady',Lightning:'bold',Ice:'calm',Light:'kind',Shadow:'sly',Plant:'kind',Metal:'steady',Sound:'free',Time:'wise',Space:'wise',Poison:'sly',Crystal:'steady',Sand:'free',Mist:'sly',Gravity:'wise',Spirit:'kind',Lava:'bold',Star:'wise',Bubble:'calm',Paper:'wise',Thread:'sly',Ash:'bold',Glass:'calm',Moon:'kind',Storm:'free',Bone:'steady',Ink:'sly'};
+const MODS=[['',1,60],['Twin',1.1,14],['Ancient',1.2,9],['Hollow',1.15,8],['Radiant',1.25,5],['Abyssal',1.35,3],['Primordial',1.5,1]]; // name, power mult, weight
+const RARITY=['','Common','Uncommon','Rare','Epic','Legendary'];
+const ADJ=['Searing','Silent','Howling','Crushing','Piercing','Gleaming','Veiled','Shattering','Rising','Endless','Spiral','Wild'];
+const NOUN={dmg:['Lance','Burst','Fang','Wave','Bolt','Storm'],heal:['Bloom','Mend','Grace'],shield:['Wall','Ward','Shell'],dot:['Curse','Mark','Haze']};
+const QUIZ=[
+ ['A rival insults you. You…',[['Strike first','bold'],['Stay composed','calm'],['Plot a clever comeback','sly'],['Shrug, walk away','free']]],
+ ['Your ideal place:',[['A quiet library','wise'],['An open sky','free'],['A mountain fortress','steady'],['A sunny garden','kind']]],
+ ['A friend is hurt. You…',[['Heal them','kind'],['Guard them','steady'],['Hunt the attacker','bold'],['Find the root cause','wise']]],
+ ['Pick a word:',[['Shadow','sly'],['Tide','calm'],['Spark','bold'],['Root','steady']]],
+ ['Your greatest strength:',[['Patience','calm'],['Curiosity','wise'],['Courage','bold'],['Loyalty','kind']]],
+ ['When a plan fails you…',[['Improvise','free'],['Try again harder','steady'],['Find a trick','sly'],['Stay calm & rethink','calm']]]];
+const BANNED=/(damn|hell|shit|fuck|bitch|ass|kill|blood|sex|nazi|crap|dick|piss)/i;
+
+// ---------- RNG ----------
+function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+const pick=(r,a)=>a[Math.floor(r()*a.length)];
+function wpick(r,list){let t=list.reduce((a,x)=>a+x[2],0),v=r()*t;for(const x of list){if((v-=x[2])<0)return x}return list[0]}
+
+// ---------- STATE ----------
+let S=load()||null, quizAns=[], E=null;
+function save(){try{localStorage.setItem('grimoire',JSON.stringify(S))}catch(e){}}
+function load(){try{return JSON.parse(localStorage.getItem('grimoire'))}catch(e){return null}}
+const $=id=>document.getElementById(id), app=$('app');
+
+// ---------- GRIMOIRE GENERATION ----------
+function makeGrimoire(answers){
+  const seed=Date.now()^Math.floor(Math.random()*1e9), r=rng(seed);
+  const traits={};answers.forEach(t=>traits[t]=(traits[t]||0)+1);
+  // weight each element by matching personality trait — rare-ish combos possible
+  const pool=Object.entries(ELEMENTS).map(([el,t])=>[el,0,1+(traits[t]||0)*4]);
+  const el=wpick(r,pool)[0], mod=wpick(r,MODS);
+  const rar=mod[2]>=60?1:mod[2]>=14?2:mod[2]>=8?3:mod[2]>=3?4:5;
+  const name=(mod[0]?mod[0]+' ':'')+el+' Magic';
+  const spells=['dmg','dmg','shield','heal'].map((k,i)=>genSpell(r,el,k,mod[1],i));
+  return {name,el,rarity:rar,mult:mod[1],seed,spells};
+}
+function genSpell(r,el,kind,mult,i){
+  const base={dmg:[14,8],heal:[16,10],shield:[14,9],dot:[6,8]}[kind];
+  const p=Math.round(base[0]*(0.85+r()*0.4)*mult);
+  return {name:`${el} ${pick(r,ADJ)} ${pick(r,NOUN[kind])}`,kind,power:p,cost:Math.round(base[1]*(0.8+r()*0.5)),cd:i===1?2:0,recoil:0,cur:0};
+}
+
+// ---------- SCREENS ----------
+function screenStart(){
+  app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><p>Every mage receives a grimoire matched to their soul. Answer honestly — the magic chooses you.</p>
+  <p class="mute">30 elements × 7 variants × randomized spells = thousands of combinations. Rarer variants drop less often.</p>
+  <button onclick="quizAns=[];screenQuiz()">Begin the Trial</button>${S?'<button onclick="screenHub()">Continue ('+S.g.name+', Lv '+S.lv+')</button>':''}</div>`;
+}
+function screenQuiz(){
+  const q=QUIZ[quizAns.length];
+  if(!q){const g=makeGrimoire(quizAns);S={g,lv:1,xp:0,hpMax:100,mpMax:60,wave:1,best:1,forgePts:0,inv:{}};save();return screenReveal()}
+  app.innerHTML=`<h1>The Trial</h1><div class="card"><p class="mute">Question ${quizAns.length+1}/${QUIZ.length}</p><h2>${q[0]}</h2>
+  ${q[1].map(a=>`<button onclick="quizAns.push('${a[1]}');screenQuiz()">${a[0]}</button>`).join('')}</div>`;
+}
+function screenReveal(){
+  const g=S.g;app.innerHTML=`<h1>Your grimoire opens…</h1><div class="card"><h2 class="r${g.rarity}">${g.name}</h2>
+  <p class="r${g.rarity}">${RARITY[g.rarity]}</p>${spellList(g.spells)}<button onclick="screenHub()">Continue</button></div>`;
+}
+function spellList(sp){return sp.map(s=>`<div>• <b>${s.name}</b> <span class="mute">${desc(s)}</span></div>`).join('')}
+function desc(s){let t={dmg:`deals ${s.power}`,heal:`heals ${s.power}`,shield:`blocks ${s.power}`,dot:`${s.power}/sec for 3s`}[s.kind];
+  t+=` · ${s.cost} MP`;if(s.cd)t+=` · ${s.cd}s cooldown`;if(s.recoil)t+=` · ${s.recoil} self-damage`;if(s.exhaust)t+=' · no mana regen for 3s';return t}
+function screenHub(){
+  const g=S.g,need=xpNeed();
+  app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><h2 class="r${g.rarity}">${g.name} <span class="mute">(${RARITY[g.rarity]})</span></h2>
+  <p>Level ${S.lv} · XP ${S.xp}/${need} · HP ${S.hpMax} · Mana ${S.mpMax} · Best wave ${S.best}</p>${bar(S.xp,need,'var(--acc)')}
+  ${spellList(g.spells)}<p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
+  <button onclick="startFight()">Fight wave ${S.wave}</button>
+  <button onclick="screenForge()" ${S.forgePts?'':'disabled'}>Spell Forge (${S.forgePts} pts)</button>
+  <button onclick="if(confirm('Abandon this grimoire and retake the trial?')){localStorage.removeItem('grimoire');S=null;screenStart()}">New grimoire</button></p>
+  <p class="mute">You earn 1 Forge point every 3 levels. Enemies grow ~18% stronger every wave. Every 5th wave has a boss.</p></div>`;
+}
+const xpNeed=()=>Math.round(40*Math.pow(1.35,S.lv-1));
+
+// ---------- SPELL FORGE ----------
+function screenForge(){
+  const cap=4+Math.floor(S.lv/2);
+  app.innerHTML=`<h1>Spell Forge</h1><div class="card">
+  <p>Name (letters only, family-friendly): <input id="fn" maxlength="24" placeholder="e.g. Comet Ward"></p>
+  <p>Effect: <select id="fk" onchange="prev()"><option value="dmg">Damage</option><option value="heal">Heal</option><option value="shield">Shield</option><option value="dot">Damage over time</option></select></p>
+  <p>Power tier: <input id="fp" type="range" min="1" max="${cap}" value="3" oninput="prev()"> <span id="fpv"></span> <span class="mute">(max ${cap} at your level)</span></p>
+  <p>Required drawback: <select id="fd" onchange="prev()"><option value="recoil">Recoil — hurts you</option><option value="cd">Long cooldown</option><option value="burn">Mana burn — costs much more</option><option value="exhaust">Exhaustion — no regen for 3s</option></select></p>
+  <p>Catalyst (optional, consumed): <select id="fc" onchange="prev()"><option value="">None</option>${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<option value="${k}">${k} ×${v} — ${ITEMS[k]}</option>`).join('')}</select></p>
+  <p id="fprev" class="card"></p><p id="ferr" style="color:var(--bad)"></p>
+  <button onclick="forge()">Forge spell</button><button onclick="screenHub()">Back</button></div>`;prev();
+}
+function forgeSpell(){
+  const k=$('fk').value,c=$('fc').value,t=+$('fp').value+(c==='Star Dust'?2:0),d=$('fd').value,m=S.g.mult,h=c==='Ancient Rune'?.5:1;
+  const s={name:'',kind:k,power:Math.round({dmg:12,heal:12,shield:12,dot:5}[k]*t*0.75*m+8),cost:4+t*4,cd:1,recoil:0,cur:0};
+  if(c==='Ember Core')s.power=Math.round(s.power*1.2);
+  if(d==='recoil')s.recoil=Math.round(t*3.5*h);if(d==='cd')s.cd=1+Math.ceil((1+t/2)*h);
+  if(d==='burn')s.cost=Math.round(s.cost*(1+.7*h));if(d==='exhaust')s.exhaust=1;
+  if(c==='Mana Shard')s.cost=Math.round(s.cost*.7);return s;
+}
+function prev(){$('fpv').textContent=$('fp').value;$('fprev').innerHTML='Preview: '+desc(forgeSpell())}
+function forge(){
+  const n=$('fn').value.trim().replace(/\s+/g,' ');
+  if(!/^[A-Za-z ]{3,24}$/.test(n))return $('ferr').textContent='Name must be 3–24 letters.';
+  if(BANNED.test(n))return $('ferr').textContent='Please choose a family-friendly name.';
+  if(S.g.spells.length>=8)return $('ferr').textContent='Your grimoire is full (8 spells).';
+  const s=forgeSpell(),c=$('fc').value;s.name=n;if(c)S.inv[c]--;S.g.spells.push(s);S.forgePts--;save();screenHub();
+}
+
+// ---------- COMBAT (2D pixel platformer) ----------
+const FOES=['Goblin','Wraith','Golem','Harpy','Basilisk','Shade','Troll','Wyrm','Lich','Behemoth','Slime','Spider Queen','Mimic','Fire Imp','Frost Giant'];
+const TRAITS={armored:'Armored: takes 30% less damage',regen:'Regenerates HP over time',drain:'Steals 6 mana per hit',swift:'Moves twice as fast',enrage:'Hits harder over time'};
+const ITEMS={'Mana Shard':'Catalyst: spell costs 30% less mana','Ember Core':'Catalyst: +20% spell power','Ancient Rune':'Catalyst: drawback is halved','Star Dust':'Catalyst: +2 power tiers above your cap'};
+const EL_COL={Fire:'#ff6a3d',Water:'#3da5ff',Ice:'#9ee7ff',Lightning:'#ffe14d',Plant:'#5fd068',Shadow:'#a070ff',Light:'#fff3b0',Poison:'#a6e22e',Lava:'#ff4500',Star:'#ffd700',Moon:'#d8d8ff',Spirit:'#e0b0ff',Wind:'#bdf5d0',Earth:'#b08850',Metal:'#c0c8d0',Sound:'#ff9ad5',Time:'#e8d38a',Space:'#7a6cff',Crystal:'#8ff0ff',Sand:'#e6c47a',Mist:'#cfd8e0',Gravity:'#9b59b6',Bubble:'#a8e0ff',Paper:'#f5f0e0',Thread:'#ff8080',Ash:'#9a9a9a',Glass:'#d0f0ff',Storm:'#6080ff',Bone:'#eee8d0',Ink:'#5050a0'};
+const elc=()=>EL_COL[S.g.el]||'#c9a54a';
+function bar(v,m,c){return`<div class="bar"><i style="width:${Math.max(0,Math.min(100,v/m*100))}%;background:${c}"></i></div>`}
+const SPR={me:["..hhhh..",".hhhhhh.","hhhbhhhh","..ssss..","..eses..","..ssss..",".rrrrrr.","rrrrrrbb",".rrrrrbb",".rrrrrr.","..r..r..",".kk..kk."],
+ blob:["..oooo..",".oooooo.","owwoowwo","obwoobwo","oooooooo","oooooooo",".o.oo.o.","o..oo..o"]};
+function spr(c,a,x,y,map,col,s,flip){for(let r=0;r<a.length;r++)for(let q=0;q<8;q++){const ch=a[r][flip?7-q:q];if(ch!=='.'){c.fillStyle=map[ch]||col;c.fillRect(Math.round(x+q*s),Math.round(y+r*s),s,s)}}}
+const T=16,W=320,H=180,keys={};let G=null;
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=1;if(!G)return;if([' ','arrowup','arrowdown'].includes(k))e.preventDefault();const n=+e.key;if(n>=1&&n<=8)cast(n-1);if(k==='escape')leave()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
+
+function startFight(){
+  const w=S.wave,sc=Math.pow(1.18,w-1),boss=w%5===0,r=rng(w*7919+S.g.seed),cols=60+w*4,grid=[],tk=Object.keys(TRAITS);
+  let h=3;
+  while(grid.length<cols){const x=grid.length,col=new Array(12).fill(0);
+    if(x>8&&x<cols-14&&r()<.08){grid.push(col);if(r()<.5)grid.push(new Array(12).fill(0));continue}
+    if(x>4&&r()<.25)h=Math.max(2,Math.min(5,h+(r()<.5?-1:1)));for(let y=12-h;y<12;y++)col[y]=1;grid.push(col)}
+  for(let x=12;x<cols-16;x+=7+Math.floor(r()*6)){const top=grid[x].indexOf(1),y=(top<0?9:top)-3-Math.floor(r()*2);if(y>=2)for(let i=0;i<3;i++)grid[x+i][y]=1}
+  const en=[],n=4+w;
+  function spawn(cx,b){const fi=(w-1+en.length)%FOES.length,tr=w<3?[]:(b||r()<.4+w*.03)?[tk[Math.floor(r()*5)]]:[];
+    if(b&&w>=10)tr.push(tk[(tk.indexOf(tr[0])+1)%5]);
+    en.push({name:(b?'Boss ':'')+FOES[fi],col:`hsl(${fi*47%360},65%,55%)`,boss:b,tr,x:cx*T,y:0,w:b?16:8,h:b?16:8,vx:(r()<.5?-1:1)*(tr.includes('swift')?1:.5),vy:0,
+      hp:Math.round((b?150:25)*sc),atk:Math.round((b?14:8)*sc),dot:0,dotT:0})}
+  for(let i=0;i<n;i++)spawn(14+Math.floor((cols-30)*i/n+r()*3),false);
+  if(boss)spawn(cols-9,true);
+  en.forEach(e=>e.hpMax=e.hp);
+  const fc=cols-3;
+  G={grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
+     msgs:[],banner:'',bT:0,flagX:fc*T,flagY:grid[fc].indexOf(1)*T,lastSafe:24,t:0,acc:0,last:performance.now(),running:1};
+  S.g.spells.forEach(s=>s.cur=0);
+  app.innerHTML=`<h1>Wave ${w}${boss?' — BOSS':''}</h1>
+  <canvas id="cv" width="${W}" height="${H}" style="width:100%;image-rendering:pixelated;border-radius:8px;background:#000;display:block"></canvas>
+  <div class="row" id="touch" style="gap:0;margin-top:6px"><button data-k="arrowleft">◀</button><button data-k="arrowright">▶</button><button data-k=" ">Jump</button><button onclick="leave()">Retreat</button></div>
+  <div class="card"><div id="hs"></div>${S.g.spells.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${i+1}] ${s.name}<br><span class="mute">${desc(s)}</span></button>`).join('')}</div>
+  <p class="mute">Move ←/→ or A/D · Jump Space/W/↑ · Cast with number keys · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · Esc retreats.
+  Letters above enemies = traits: ${Object.entries(TRAITS).map(([k,v])=>`<b>${k[0].toUpperCase()}</b> ${v}`).join(' · ')}</p>`;
+  document.querySelectorAll('#touch [data-k]').forEach(b=>{const k=b.dataset.k;b.onpointerdown=()=>keys[k]=1;b.onpointerup=b.onpointerleave=()=>keys[k]=0});
+  G.c=$('cv').getContext('2d');updHud();requestAnimationFrame(loop);
+}
+function updHud(){$('hs').innerHTML=`HP ${Math.max(0,Math.ceil(G.hp))}/${S.hpMax}${bar(G.hp,S.hpMax,'var(--good)')}Mana ${Math.floor(G.mp)}/${S.mpMax}${bar(G.mp,S.mpMax,'var(--mana)')}XP ${S.xp}/${xpNeed()} · Lv ${S.lv}${bar(S.xp,xpNeed(),'var(--acc)')}${G.sh?'🛡️ Shield '+G.sh:''}`;
+  S.g.spells.forEach((s,i)=>{const b=$('sb'+i);if(b)b.disabled=G.mp<s.cost||s.cur>0})}
+function loop(now){if(!G||!G.running)return;G.acc+=Math.min(100,now-G.last);G.last=now;
+  while(G.acc>=16.67&&G.running){step();G.acc-=16.67}if(!G||!G.running)return;draw();if(G.t%8===0)updHud();requestAnimationFrame(loop)}
+const pop=(o,t,c)=>G.pops.push({x:o.x,y:o.y,t,c,l:50});
+function solidAt(px,py){const cx=Math.floor(px/T),cy=Math.floor(py/T);if(cx<0||cx>=G.grid.length)return 1;if(cy<0||cy>=12)return 0;return G.grid[cx][cy]}
+function box(o){return solidAt(o.x,o.y)||solidAt(o.x+o.w-.01,o.y)||solidAt(o.x,o.y+o.h-.01)||solidAt(o.x+o.w-.01,o.y+o.h-.01)}
+function move(o){let bx=0;o.x+=o.vx;if(box(o)){o.x=o.vx>0?Math.floor((o.x+o.w)/T)*T-o.w:Math.floor(o.x/T+1)*T;bx=1}
+  o.vy=Math.min(o.vy+.35,7);o.y+=o.vy;o.on=0;
+  if(box(o)){if(o.vy>0){o.y=Math.floor((o.y+o.h)/T)*T-o.h;o.on=1}else o.y=Math.floor(o.y/T+1)*T;o.vy=0}return bx}
+const ov=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+function gainXP(x){S.xp+=x;while(S.xp>=xpNeed()){S.xp-=xpNeed();S.lv++;S.hpMax+=12;S.mpMax+=6;if(G)G.hp+=12;S.g.spells.forEach(s=>s.power=Math.round(s.power*1.06));
+  say('Level up! Lv '+S.lv);if(S.lv%3===0){S.forgePts++;say('+1 Forge point!')}}}
+function say(m){if(G){G.msgs.push(m);G.banner=m;G.bT=120}}
+function hurt(e,d){if(e.dead)return;if(e.tr.includes('armored'))d=Math.round(d*.7);e.hp-=d;pop(e,'-'+d,'#fff');
+  if(e.hp<=0){e.dead=1;gainXP(Math.round((e.boss?30:4)*G.sc));const ik=Object.keys(ITEMS),n=e.boss?2:Math.random()<.25?1:0;
+    for(let i=0;i<n;i++){const it=ik[Math.floor(Math.random()*(e.boss?4:3))];S.inv[it]=(S.inv[it]||0)+1;say('Found: '+it+'!')}}}
+function cast(i){if(!G||!G.running)return;const s=S.g.spells[i],p=G.p;if(!s||G.mp<s.cost||s.cur>0||G.gcd>0)return;
+  G.mp-=s.cost;s.cur=Math.round((s.cd+.6)*60);G.gcd=15;
+  if(s.kind==='dmg'||s.kind==='dot')G.proj.push({x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*4,dmg:s.power,dot:s.kind==='dot',life:90});
+  if(s.kind==='heal'){G.hp=Math.min(S.hpMax,G.hp+s.power);pop(p,'+'+s.power,'#4caf7d')}
+  if(s.kind==='shield'){G.sh+=s.power;pop(p,'+'+s.power+' shield','#4a8fd9')}
+  if(s.recoil){G.hp-=s.recoil;pop(p,'-'+s.recoil,'#d9534f')}
+  if(s.exhaust)G.exh=180;updHud()}
+function step(){
+  const p=G.p,L=keys.arrowleft||keys.a?1:0,R=keys.arrowright||keys.d?1:0,J=keys[' ']||keys.w||keys.arrowup;G.t++;
+  p.vx=(R-L)*1.6;if(p.vx)p.dir=Math.sign(p.vx);
+  if(J&&p.on){p.vy=-6.2;p.on=0}if(!J&&p.vy<-2)p.vy=-2;
+  move(p);p.x=Math.max(0,Math.min(p.x,G.cols*T-8));
+  if(p.on&&solidAt(p.x+4,p.y+p.h+1))G.lastSafe=p.x;
+  if(p.y>H){const d=Math.round(S.hpMax*.2);G.hp-=d;p.x=G.lastSafe;p.y=0;p.vy=0;p.inv=60;pop(p,'-'+d+' fell!','#d9534f')}
+  if(G.exh>0)G.exh--;else G.mp=Math.min(S.mpMax,G.mp+7/60);
+  S.g.spells.forEach(s=>s.cur>0&&s.cur--);G.gcd--;p.inv--;if(G.bT>0)G.bT--;
+  G.proj=G.proj.filter(q=>{q.x+=q.vx;q.life--;if(q.life<=0||solidAt(q.x+2,q.y+1))return false;
+    const e=G.en.find(e=>!e.dead&&ov({x:q.x,y:q.y,w:4,h:3},e));if(e){if(q.dot){e.dot=q.dmg;e.dotT=180;pop(e,'cursed','#a6e22e')}else hurt(e,Math.round(q.dmg*(0.9+Math.random()*.2)));return false}return true});
+  for(const e of G.en){if(e.dead)continue;
+    if(move(e)||(e.on&&!solidAt(e.vx>0?e.x+e.w+1:e.x-1,e.y+e.h+2)))e.vx*=-1;
+    if(e.y>H){e.dead=1;continue}
+    if(e.tr.includes('regen'))e.hp=Math.min(e.hpMax,e.hp+e.hpMax*.04/60);
+    if(e.tr.includes('enrage'))e.atk*=1.0005;
+    if(e.dotT>0){e.dotT--;if(e.dotT%60===0)hurt(e,e.dot)}
+    if(!e.dead&&ov(p,e)){
+      if(p.vy>0&&p.y+p.h-e.y<7){hurt(e,10+S.lv*3);p.vy=-4.5}
+      else if(p.inv<=0){let a=Math.round(e.atk*(0.8+Math.random()*.4));const b=Math.min(G.sh,a);G.sh-=b;a-=b;G.hp-=a;
+        pop(p,a?'-'+a:'blocked',a?'#d9534f':'#4a8fd9');p.inv=60;p.vy=-3;const k=p.x<e.x?-12:12;p.x+=k;if(box(p))p.x-=k;
+        if(e.tr.includes('drain')){G.mp=Math.max(0,G.mp-6);pop(e,'-6 mana','#4a8fd9')}}}}
+  G.pops=G.pops.filter(o=>--o.l>0);
+  if(G.hp<=0)return finish(false);
+  if(p.x>=G.flagX-4){if(G.en.some(e=>e.boss&&!e.dead)){if(G.bT<=0)say('Defeat the boss to claim the flag!')}else finish(true)}
+}
+function draw(){
+  const c=G.c,p=G.p,cam=Math.round(Math.max(0,Math.min(p.x-130,G.cols*T-W)));
+  c.fillStyle='#1b1430';c.fillRect(0,0,W,H);
+  c.fillStyle='#fff';for(let i=0;i<45;i++)c.fillRect((((i*97-cam*.1)%W)+W)%W,(i*53)%100,1,1);
+  c.fillStyle='#2a2045';for(let x=0;x<W;x+=4){const wx=x+cam*.4,hh=40+Math.sin(wx/40)*15+Math.sin(wx/17)*6;c.fillRect(x,H-hh-20,4,hh+20)}
+  const c0=Math.floor(cam/T);
+  for(let cx=c0;cx<c0+22&&cx<G.cols;cx++)for(let cy=0;cy<12;cy++)if(G.grid[cx][cy]){const x=cx*T-cam,y=cy*T;
+    c.fillStyle='#6b4a2b';c.fillRect(x,y,T,T);c.fillStyle='#57391f';c.fillRect(x+3,y+7,2,2);c.fillRect(x+10,y+12,2,2);
+    if(!G.grid[cx][cy-1]){c.fillStyle='#3f9b45';c.fillRect(x,y,T,4);c.fillStyle='#7ddc6a';c.fillRect(x,y,T,1)}}
+  const fx=G.flagX-cam,locked=G.en.some(e=>e.boss&&!e.dead);
+  c.fillStyle='#ccc';c.fillRect(fx,G.flagY-56,2,56);c.fillStyle=locked?'#d9534f':'#ffd700';for(let i=0;i<8;i++)c.fillRect(fx+2,G.flagY-56+i,12-i*1.5,1);
+  for(const e of G.en){if(e.dead)continue;const x=e.x-cam;if(x<-20||x>W+20)continue;
+    spr(c,SPR.blob,x,e.y,{w:'#fff',b:'#000'},e.col,e.boss?2:1,e.vx<0);
+    c.fillStyle='#000';c.fillRect(x,e.y-4,e.w,2);c.fillStyle='#d9534f';c.fillRect(x,e.y-4,e.w*Math.max(0,e.hp)/e.hpMax,2);
+    c.font='8px monospace';c.fillStyle='#ffb020';c.fillText((e.boss?e.name+' ':'')+e.tr.map(t=>t[0].toUpperCase()).join(''),x,e.y-6)}
+  for(const q of G.proj){c.fillStyle=q.dot?'#a6e22e':elc();c.fillRect(q.x-cam,q.y,4,3);c.globalAlpha=.5;c.fillRect(q.x-cam-q.vx,q.y+1,3,1);c.globalAlpha=1}
+  if(!(p.inv>0&&G.t%6<3))spr(c,SPR.me,p.x-cam,p.y,{h:'#3a2f55',s:'#f1c27d',e:'#000',k:'#222',b:'#c9a54a'},elc(),1,p.dir<0);
+  if(G.sh>0){c.strokeStyle='#4a8fd9';c.strokeRect(p.x-cam-2.5,p.y-2.5,13,17)}
+  c.font='8px monospace';for(const o of G.pops){c.fillStyle=o.c;c.fillText(o.t,o.x-cam,o.y-(50-o.l)*.5)}
+  if(G.bT>0){c.font='bold 10px monospace';c.textAlign='center';c.fillStyle='#000';c.fillText(G.banner,W/2+1,31);c.fillStyle='#ffd700';c.fillText(G.banner,W/2,30);c.textAlign='left'}
+}
+function finish(won){
+  G.running=0;const w=S.wave;
+  if(won){const xp=Math.round(20*Math.pow(1.22,w-1));G.msgs.unshift(`Victory! +${xp} XP for clearing the wave`);gainXP(xp);S.wave++;S.best=Math.max(S.best,S.wave)}
+  else{S.wave=Math.max(1,w-2);G.msgs.unshift(`Defeated… you retreat to wave ${S.wave}.`)}
+  save();const m=G.msgs;G=null;
+  app.innerHTML=`<h1>${won?'Wave cleared!':'Defeated'}</h1><div class="card">${m.map(x=>`<div>${x}</div>`).join('')}
+  <p>Lv ${S.lv} · XP ${S.xp}/${xpNeed()}</p>${bar(S.xp,xpNeed(),'var(--acc)')}<button onclick="screenHub()">Continue</button></div>`;
+}
+function leave(){if(!G)return;G.running=0;G=null;save();screenHub()}
+if(S)S.inv=S.inv||{};
+S?screenHub():screenStart();
+</script></body></html>
