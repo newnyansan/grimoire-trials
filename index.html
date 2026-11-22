@@ -241,9 +241,9 @@ function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.
   const c=costOf(s,o),ovf=overflow();let pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1)*(G.pas==='Arcane Focus'?1.15:1)*(S.pact==='spirit'?1.1:S.pact==='dark'?1.3:1)*(S.squad==='lions'&&G.hp>S.hpMax*.5?1.15:1)*(1+.03*rankIdx()));
   if(ovf){if(G.hp<=Math.ceil(c/2)+1)return;G.hp-=Math.ceil(c/2)}else{if(G.mp<c)return;G.mp-=c}
   s.cur=Math.round((s.cd+.6)*60);G.gcd=15;burst(p.x+(p.dir>0?9:-1),p.y+6,elc(),6,1.2);sfx('cast');if(o)say('OVERCHARGE: '+s.name+'!');
-  let combo=null,xfx=[],det=0;if(G.last&&G.t-G.last.t<60&&G.last.i!==i)combo=COMBOS[G.last.k+'>'+s.kind];G.last={i,k:s.kind,t:G.t};
+  let combo=null,xfx=[],det=0;if(G.lastCast&&G.t-G.lastCast.t<60&&G.lastCast.i!==i)combo=COMBOS[G.lastCast.k+'>'+s.kind];G.lastCast={i,k:s.kind,t:G.t};
   if(combo){say('COMBO: '+combo+'!');sfx('combo');burst(p.x+4,p.y+6,'#ffd700',14,2);if(/Chain/.test(combo))pw*=1.3;if(/Sanctuary|Second/.test(combo))pw*=1.5;if(/Deep/.test(combo))pw*=2;
-    if(/Bulwark/.test(combo))xfx.push('pierce');if(/Life/.test(combo))xfx.push('drain');if(/Plague/.test(combo))xfx.push('multi');if(/Detonation/.test(combo))det=1;pw=Math.round(pw);G.last=null}
+    if(/Bulwark/.test(combo))xfx.push('pierce');if(/Life/.test(combo))xfx.push('drain');if(/Plague/.test(combo))xfx.push('multi');if(/Detonation/.test(combo))det=1;pw=Math.round(pw);G.lastCast=null}
   if(s.kind==='dmg'||s.kind==='dot'){const fx=[...(s.fx||[]),...xfx];const mk=(vy,life)=>({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life});
   if(!shapeCast(s,mk,pw))for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
   if(s.kind==='heal'){const hv=Math.round(pw*(S.squad==='hearts'?1.3:1));G.hp=Math.min(S.hpMax,G.hp+hv);pop(p,'+'+hv,'#4caf7d')}
