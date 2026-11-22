@@ -9,6 +9,10 @@ A 2D pixel-art magic platformer that runs in the browser.
 - Enemies drop items you can use as forge catalysts
 
 ## Play
-Open `index.html` in any browser. No install needed. Progress saves in your browser.
+
+**▶ [Play it live in your browser](https://newnyansan.github.io/grimoire-trials/)**
+
+Or download and open `index.html` locally.
+No install needed. Progress saves in your browser.
 
 **Controls:** ←/→ or A/D move · Space/W/↑ jump · 1–8 cast spells · Esc retreat
