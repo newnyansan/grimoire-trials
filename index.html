@@ -19,11 +19,11 @@ button:hover:not(:disabled){border-color:var(--acc)}button:disabled{opacity:.4;c
 .tag{display:inline-block;background:#3a2f55;border-radius:5px;padding:1px 6px;font-size:12px;margin-left:4px}
 #wrap{position:relative}#cv{width:100%;image-rendering:pixelated;border-radius:10px;background:#000;display:block;box-shadow:0 0 0 2px #2d2840,0 8px 30px rgba(120,80,220,.35)}
 #ov{position:absolute;inset:0;overflow:auto;background:rgba(20,18,28,.95);border-radius:8px;padding:8px 12px;font-family:monospace;font-size:13px}#ov:empty{display:none}
-#ov h1{font-size:18px}#ov .card{padding:8px;margin:6px 0}#touch button{min-width:56px}
+#ov h1{font-size:18px}#ov .card{padding:8px;margin:6px 0}#touch{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#touch button{min-width:60px;padding:12px 10px;font-size:15px;margin:0;touch-action:manipulation}
 input,select{background:#0e0c14;color:var(--ink);border:1px solid #453d5e;border-radius:6px;padding:6px;font:inherit}
 </style></head><body><main><h1 id="ttl">Grimoire Trials</h1>
 <div id="wrap"><canvas id="cv" width="320" height="180"></canvas><div id="ov"></div></div>
-<div id="touch"><button data-k="arrowleft">◀</button><button data-k="arrowright">▶</button><button data-k=" ">Jump</button><button onclick="interact()">Act (E)</button></div>
+<div id="touch"><button data-k="arrowleft">◀</button><button data-k="arrowright">▶</button><button data-k=" ">Jump</button><button onclick="interact()">Act (E)</button><button onclick="melee()">Melee</button><button onclick="dash()">Dash</button><button onclick="if(G&&G.mode==='fight')busy()?app.innerHTML='':screenPause()">Pause</button></div>
 <div class="card" id="hud"></div><p class="mute" id="help"></p></main>
 <script>
 // ---------- DATA ----------
@@ -74,7 +74,7 @@ function genSpell(r,el,kind,mult,i){
 function screenStart(){
   app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><p>Every mage receives a grimoire matched to their soul. Answer honestly — the magic chooses you.</p>
   <p class="mute">30 elements × 7 variants × randomized spells = thousands of combinations. Rarer variants drop less often.</p>
-  <button onclick="if(!S||confirm('Replace your current grimoire?')){quizAns=[];screenQuiz()}">${S?'Retake the Trial':'Begin the Trial'}</button><button onclick="app.innerHTML=''">Close</button>${S?'<button onclick="screenHub()">Continue ('+S.g.name+', Lv '+S.lv+')</button>':''}</div>`;
+  <button onclick="if(!S||confirm('Replace your current grimoire?')){quizAns=[];screenQuiz()}">${S?'Retake the Trial':'Begin the Trial'}</button><button onclick="app.innerHTML=''">Close</button>${S&&S.lv>=20&&!S.awake?'<button onclick="startAwaken()">⚡ Awakening Trial</button><p class="mute">Face your own shadow. Win to awaken your magic: +25% power to every spell.</p>':S&&!S.awake?'<p class="mute">At level 20 the shrine can awaken your magic.</p>':''}${S?'<button onclick="screenHub()">Continue ('+S.g.name+', Lv '+S.lv+')</button>':''}</div>`;
 }
 function screenQuiz(){
   const q=QUIZ[quizAns.length];
@@ -88,14 +88,14 @@ function screenReveal(){
 }
 function spellList(sp){return sp.map(s=>`<div>• <b>${s.name}</b> <span class="mute">${desc(s)}</span></div>`).join('')}
 function desc(s){let t={dmg:`deals ${s.power}`,heal:`heals ${s.power}`,shield:`blocks ${s.power}`,dot:`${s.power}/sec for 3s`}[s.kind];
-  t+=` · ${s.cost} MP`;if(s.cd)t+=` · ${s.cd}s cooldown`;if(s.recoil)t+=` · ${s.recoil} self-damage`;if(s.exhaust)t+=' · no mana regen for 3s';if(s.fx&&s.fx.length)t+=' · '+s.fx.join(', ');return t}
+  t+=` · ${s.cost} MP`;if(s.cd)t+=` · ${s.cd}s cooldown`;if(s.recoil)t+=` · ${s.recoil} self-damage`;if(s.exhaust)t+=' · no mana regen for 3s';if(s.shape)t+=' · '+s.shape+' shape';if(s.fx&&s.fx.length)t+=' · '+s.fx.join(', ');return t}
 function screenHub(){
   const g=S.g,need=xpNeed();
   app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><h2 class="r${g.rarity}">${g.name} <span class="mute">(${RARITY[g.rarity]} · ${'✦'.repeat(g.marks||3)})</span></h2><p class="mute">Element family: ${[g.el,g.el2].filter(Boolean).map(x=>(FAMOF(x)||'none')).join(' + ')}</p>
   <p>Level ${S.lv} · XP ${S.xp}/${need} · HP ${S.hpMax} · Mana ${S.mpMax} · Best wave ${S.best}</p>${bar(S.xp,need,'var(--acc)')}
   ${spellList(g.spells)}<p><b>Story:</b> ${storyLine()}</p><p><b>Techniques</b> <span class="mute">(unlock by leveling)</span></p>${TECH.map(t=>`<div class="${S.lv>=t[1]?"":"mute"}">${S.lv>=t[1]?"✔":"🔒 Lv "+t[1]} <b>${t[0]}</b> — ${t[2]}</div>`).join("")}<p><b>Combos</b> <span class="mute">(cast two different spells within 1s)</span></p><div class="mute">${Object.entries(COMBOS).map(([k,v])=>`<b>${v}</b>: ${k.split('>').map(x=>KN[x]).join(' → ')} (${COMBO_INFO[v]})`).join('<br>')}</div><p class="mute">Materials: ${Object.entries(S.mats||{}).filter(x=>x[1]).map(([k,v])=>k+' ×'+v).join(', ')||'none yet (enemies drop them)'}</p><p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
   <button onclick="startFight()">Fight wave ${S.wave}</button>
-  <button onclick="screenTree()">Skill Trees</button><button onclick="screenLoadout()">Loadout (${(S.load||[]).length||Math.min(5,g.spells.length)}/5)</button><button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
+  <button onclick="screenTree()">Skill Trees</button><button onclick="screenBackup()">Backup</button><button onclick="screenLoadout()">Loadout (${(S.load||[]).length||Math.min(5,g.spells.length)}/5)</button><button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
   <button onclick="if(confirm('Abandon this grimoire and retake the trial?')){localStorage.removeItem('grimoire');S=null;app.innerHTML=''}">New grimoire</button><button onclick="app.innerHTML=''">Close</button></p>
   <p class="mute">Walk to the Spell Forge or Wave Portal in town to use them. You earn 1 Forge point every 3 levels, and your grimoire grants a new spell every 2 levels. Visit the Spell Sage in town to design spells by describing them. Enemies grow ~18% stronger every wave. Every 5th wave has a boss.</p></div>`;
 }
@@ -107,13 +107,15 @@ function screenForge(){
   app.innerHTML=`<h1>Spell Forge</h1><div class="card">
   <p>Name (letters only, family-friendly): <input id="fn" maxlength="24" placeholder="e.g. Comet Ward"></p>
   <p>Effect: <select id="fk" onchange="prev()"><option value="dmg">Damage</option><option value="heal">Heal</option><option value="shield">Shield</option><option value="dot">Damage over time</option></select></p>
+  <p>Shape: <select id="fsh" onchange="prev()"><option value="">Bolt (default)</option><option value="beam">Beam: instant line, hits every enemy in it</option><option value="wave">Wave: short cone of 5 shots</option><option value="orb">Orb: circles you for 5s</option><option value="trap">Trap: explodes when an enemy steps on it</option><option value="wall">Wall: barrier that blocks shots (shields only)</option></select></p>
   <p>Power tier: <input id="fp" type="range" min="1" max="${cap}" value="3" oninput="prev()"> <span id="fpv"></span> <span class="mute">(max ${cap} at your level)</span></p>
   <p>Required drawback: <select id="fd" onchange="prev()"><option value="recoil">Recoil — hurts you</option><option value="cd">Long cooldown</option><option value="burn">Mana burn — costs much more</option><option value="exhaust">Exhaustion — no regen for 3s</option></select></p>
   <p>Catalyst (optional, consumed): <select id="fc" onchange="prev()"><option value="">None</option>${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<option value="${k}">${k} ×${v} — ${ITEMS[k]}</option>`).join('')}</select></p>
   <p id="fprev" class="card"></p><p id="ferr" style="color:var(--bad)"></p>
-  <button onclick="forge()">Forge spell</button><button onclick="screenHub()">Back</button></div>`;prev();
+  <button onclick="forge()">Forge spell</button><button onclick="screenHub()">Back</button></div>
+  <div class="card"><b>Restriction Pact</b> (${S.restr||0}/3)<p class="mute">Permanently give up 10% of your max HP for +8% power on every spell you own.</p><button ${(S.restr||0)>=3?'disabled':''} onclick="restrict()">Make the pact</button></div>`;prev();
 }
-function forgeSpell(){return buildSpell($('fk').value,+$('fp').value+($('fc').value==='Star Dust'?2:0),$('fd').value,$('fc').value)}
+function forgeSpell(){return shapeIt(buildSpell($('fk').value,+$('fp').value+($('fc').value==='Star Dust'?2:0),$('fd').value,$('fc').value),$('fsh').value)}
 function buildSpell(k,t,d,c){const m=S.g.mult,h=c==='Ancient Rune'?.5:1;
   const s={name:'',kind:k,power:Math.round({dmg:12,heal:12,shield:12,dot:5}[k]*t*0.75*m+8),cost:4+t*4,cd:1,recoil:0,cur:0};
   if(c==='Ember Core')s.power=Math.round(s.power*1.2);
@@ -144,7 +146,7 @@ const T=16,W=320,H=180,keys={};let G=null;
 addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase();keys[k]=1;ac();if(k==='m'){muted=!muted;try{localStorage.setItem('mute',muted?'1':'0')}catch(x){}if(G)say('Sound '+(muted?'off':'on'))}if(!G)return;
   if([' ','arrowup','arrowdown'].includes(k))e.preventDefault();
   if(G.mode==='fight'){const n=e.code.startsWith('Digit')?+e.code.slice(5):0;if(n>=1&&n<=8&&!e.repeat)G.chg={i:n-1,t:performance.now()};
-    if(k==='escape')leave();if(k==='f'||k==='j')melee();if(k==='q'&&has('Mana Armor')){G.armor=!G.armor;say('Mana Armor '+(G.armor?'ON':'off'))}
+    if(k==='escape'||k==='p'){busy()?app.innerHTML='':screenPause()}if(k==='f'||k==='j')melee();if(k==='q'&&has('Mana Armor')){G.armor=!G.armor;say('Mana Armor '+(G.armor?'ON':'off'))}
     if(k==='r')field();if(k==='x'||k==='k')dash();if(k==='v'&&has('Flight')){G.fly=!G.fly;say('Flight '+(G.fly?'ON':'off'))}}
   else{if(k==='e'||k==='arrowdown')interact();if(k==='escape')app.innerHTML=''}});
 document.querySelectorAll('#touch [data-k]').forEach(b=>{const k=b.dataset.k;b.onpointerdown=()=>keys[k]=1;b.onpointerup=b.onpointerleave=()=>keys[k]=0});
@@ -186,18 +188,18 @@ function startFight(){
     const fm=w<2?null:Object.keys(FAM)[Math.floor(r()*6)];en.push({fam:fm,name:(b?'Boss ':'')+FOES[fi],col:fm?FAMCOL[fm]:`hsl(${fi*47%360},65%,55%)`,boss:b,tr,x:cx*T,y:0,w:b?16:8,h:b?16:8,vx:(r()<.5?-1:1)*(tr.includes('swift')?1:.5),vy:0,
       hp:Math.round((b?150:25)*sc),atk:Math.round((b?14:8)*sc),dot:0,dotT:0})}
   for(let i=0;i<n;i++)spawn(14+Math.floor((cols-30)*i/n+r()*3),false);
-  if(boss){spawn(cols-9,true);const bi=bio.boss,bz=en[en.length-1];bz.name=BOSSES[bi][0];bz.pat=[BOSSES[bi][1]].concat(bi===4?['charge']:[]).concat(w>=30?[BOSSES[(bi+1)%5][1]]:[]);if(st&&st.final){bz.name='Archmage Veyl';bz.pat=BOSSES.map(b=>b[1]);bz.hp=Math.round(bz.hp*1.6);bz.col='#a040ff'}bz.bt=0}
+  if(boss){spawn(cols-9,true);const bi=bio.boss,bz=en[en.length-1];bz.name=BOSSES[bi][0];bz.pat=[BOSSES[bi][1]].concat(bi===4?['charge']:[]).concat(w>=30?[BOSSES[(bi+1)%5][1]]:[]);if(st&&st.awaken){bz.name='Shadow of '+S.g.name;bz.pat=['shoot','charge','ward'];bz.col=elc()}if(st&&st.final){bz.name='Archmage Veyl';bz.pat=BOSSES.map(b=>b[1]);bz.hp=Math.round(bz.hp*1.6);bz.col='#a040ff'}bz.bt=0}
   const ros=w<=2?['slime','bat']:bio.roster;en.forEach(e=>{if(!e.boss){e.type=ros[Math.floor(r()*ros.length)];e.h=HOF[e.type];e.hp=Math.round(e.hp*(HPM[e.type]||1));e.atk=Math.round(e.atk*(ATKM[e.type]||1));
     if(e.type==='bat'||e.type==='ghost'){e.y=30+r()*50;e.by=e.y}e.name=TNAME[e.type]}e.hpMax=e.hp});
   const fc=cols-3;
-  G={mode:'fight',bio,story:st&&st.story,obj:st?st.obj:null,final:!!(st&&st.final),kills:0,killGoal:0,pages:[],fires:[],windDir:1,pvx:0,parts:[],shake:0,air:0,jPrev:0,dashT:0,dashCd:0,fly:false,hov:0,eproj:[],bossSeen:0,sp:(fixLoad(),S.load.map(i=>S.g.spells[i])),field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
+  G={mode:'fight',orbs:[],traps:[],walls:[],beams:[],awaken:!!(st&&st.awaken),bio,story:st&&st.story,obj:st?st.obj:null,final:!!(st&&st.final),kills:0,killGoal:0,pages:[],fires:[],windDir:1,pvx:0,parts:[],shake:0,air:0,jPrev:0,dashT:0,dashCd:0,fly:false,hov:0,eproj:[],bossSeen:0,sp:(fixLoad(),S.load.map(i=>S.g.spells[i])),field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
      msgs:[],banner:'',bT:0,flagX:fc*T,flagY:grid[fc].indexOf(1)*T,lastSafe:24,t:0,acc:0,last:performance.now(),running:1};
   G.killGoal=Math.ceil(en.filter(e=>!e.boss).length*.7);
   if(G.obj==='pages')for(let i=0;i<3;i++){let cx=Math.floor(cols*(.22+.25*i)+r()*4);for(let k=0;k<8&&!grid[cx].includes(1);k++)cx++;const top=grid[cx].indexOf(1);G.pages.push({x:cx*T+8,y:(top<0?9:top)*T-(r()<.5?14:40),got:0})}
   G.sp.forEach(s=>s.cur=0);
-  music('fight');app.innerHTML='';$('ttl').textContent=st?(st.final?'The Hollow Citadel — Final Battle':`${bio.n} — Stage ${st.story.s+1}/4`):`Wave ${w} · ${bio.n}${boss?' — BOSS':''}`;
+  music('fight');app.innerHTML='';$('ttl').textContent=st?(st.awaken?'Awakening Trial':st.final?'The Hollow Citadel — Final Battle':`${bio.n} — Stage ${st.story.s+1}/4`):`Wave ${w} · ${bio.n}${boss?' — BOSS':''}`;
   $('hud').innerHTML=`<div id="hs"></div>${G.sp.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${i+1}] ${s.name}<br><span class="mute">${desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;
-  $('help').innerHTML=`Move ←/→ or A/D · Jump Space/W/↑ · Cast with number keys (hold 0.6s to overcharge) · F melee · X dash · V flight · Shift enhance · Q armor · R field · jump again mid-air / hold jump to hover (as you unlock them) · M mutes sound<br>Enemy color = element: <b style="color:#ff6a3d">fire</b> beats <b style="color:#5fd068">nature</b> beats <b style="color:#ffe14d">storm</b> beats <b style="color:#3da5ff">water</b> beats fire; <b style="color:#fff3b0">light</b> and <b style="color:#a070ff">shadow</b> beat each other. Cast two different spells within 1s for a combo. · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · Esc retreats.
+  $('help').innerHTML=`Move ←/→ or A/D · Jump Space/W/↑ · Cast with number keys (hold 0.6s to overcharge) · F melee · X dash · V flight · Shift enhance · Q armor · R field · jump again mid-air / hold jump to hover (as you unlock them) · P/Esc pause · M mutes sound<br>Enemy color = element: <b style="color:#ff6a3d">fire</b> beats <b style="color:#5fd068">nature</b> beats <b style="color:#ffe14d">storm</b> beats <b style="color:#3da5ff">water</b> beats fire; <b style="color:#fff3b0">light</b> and <b style="color:#a070ff">shadow</b> beat each other. Cast two different spells within 1s for a combo. · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · Esc retreats.
   Letters above enemies = traits: ${Object.entries(TRAITS).map(([k,v])=>`<b>${k[0].toUpperCase()}</b> ${v}`).join(' · ')}`;
   say(bio.n+(bio.liq?' — beware the '+bio.liq+'!':bio.haz==='ice'?' — the ground is slippery!':bio.haz==='wind'?' — watch for wind gusts!':''));G.c=$('cv').getContext('2d');updHud();const g=G;requestAnimationFrame(t=>loop(t,g));
 }
@@ -205,7 +207,7 @@ function updHud(){if(G.mode==='town'){$('hs').innerHTML=S?`<b class="r${S.g.rari
   $('hs').innerHTML=`HP ${Math.max(0,Math.ceil(G.hp))}/${S.hpMax}${bar(G.hp,S.hpMax,'var(--good)')}Mana ${Math.floor(G.mp)}/${S.mpMax}${bar(G.mp,S.mpMax,'var(--mana)')}XP ${S.xp}/${xpNeed()} · Lv ${S.lv}${bar(S.xp,xpNeed(),'var(--acc)')}${G.sh?'🛡️ Shield '+G.sh:''}${techLine()}`;
   const ovf=overflow();G.sp.forEach((s,i)=>{const b=$('sb'+i);if(b)b.disabled=(!ovf&&G.mp<costOf(s))||s.cur>0})}
 function loop(now,g){if(G!==g||!g.running)return;g.acc+=Math.min(100,now-g.last);g.last=now;
-  while(g.acc>=16.67&&G===g&&g.running){step();g.acc-=16.67}if(G!==g||!g.running)return;draw();if(g.t%8===0)updHud();requestAnimationFrame(t=>loop(t,g))}
+  while(g.acc>=16.67&&G===g&&g.running){if(!(g.mode==='fight'&&busy()))step();g.acc-=16.67}if(G!==g||!g.running)return;draw();if(g.t%8===0)updHud();requestAnimationFrame(t=>loop(t,g))}
 const pop=(o,t,c)=>G.pops.push({x:o.x,y:o.y,t,c,l:50});
 function solidAt(px,py){const cx=Math.floor(px/T),cy=Math.floor(py/T);if(cx<0||cx>=G.grid.length)return 1;if(cy<0||cy>=12)return 0;return G.grid[cx][cy]===1?1:0}
 function box(o){return solidAt(o.x,o.y)||solidAt(o.x+o.w-.01,o.y)||solidAt(o.x,o.y+o.h-.01)||solidAt(o.x+o.w-.01,o.y+o.h-.01)}
@@ -229,16 +231,17 @@ TECH.sort((a,b)=>a[1]-b[1]);
 const has=n=>!!S&&S.lv>=TECH.find(t=>t[0]===n)[1];
 const overflow=()=>has('Mana Overflow')&&G.hp<S.hpMax*.2;
 const costOf=(s,o)=>Math.round(s.cost*(o?2:1)*(G.field>0?.7:1));
-function cast(i,o){if(!G||!G.running||G.mode!=='fight')return;const s=G.sp[i],p=G.p;if(!s||s.cur>0||G.gcd>0)return;
+function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.sp[i],p=G.p;if(!s||s.cur>0||G.gcd>0)return;
   const c=costOf(s,o),ovf=overflow();let pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1));
   if(ovf){if(G.hp<=Math.ceil(c/2)+1)return;G.hp-=Math.ceil(c/2)}else{if(G.mp<c)return;G.mp-=c}
   s.cur=Math.round((s.cd+.6)*60);G.gcd=15;burst(p.x+(p.dir>0?9:-1),p.y+6,elc(),6,1.2);sfx('cast');if(o)say('OVERCHARGE: '+s.name+'!');
   let combo=null,xfx=[],det=0;if(G.last&&G.t-G.last.t<60&&G.last.i!==i)combo=COMBOS[G.last.k+'>'+s.kind];G.last={i,k:s.kind,t:G.t};
   if(combo){say('COMBO: '+combo+'!');sfx('combo');burst(p.x+4,p.y+6,'#ffd700',14,2);if(/Chain/.test(combo))pw*=1.3;if(/Sanctuary|Second/.test(combo))pw*=1.5;if(/Deep/.test(combo))pw*=2;
     if(/Bulwark/.test(combo))xfx.push('pierce');if(/Life/.test(combo))xfx.push('drain');if(/Plague/.test(combo))xfx.push('multi');if(/Detonation/.test(combo))det=1;pw=Math.round(pw);G.last=null}
-  if(s.kind==='dmg'||s.kind==='dot'){const fx=[...(s.fx||[]),...xfx];for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
+  if(s.kind==='dmg'||s.kind==='dot'){const fx=[...(s.fx||[]),...xfx];const mk=(vy,life)=>({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life});
+  if(!shapeCast(s,mk,pw))for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
   if(s.kind==='heal'){G.hp=Math.min(S.hpMax,G.hp+pw);pop(p,'+'+pw,'#4caf7d')}
-  if(s.kind==='shield'){G.sh+=pw;pop(p,'+'+pw+' shield','#4a8fd9')}
+  if(s.kind==='shield'){if(s.shape==='wall'){G.walls.push({x:p.x+(p.dir>0?12:-8),y:p.y-14,w:5,h:28,l:360,col:elc()});pop(p,'barrier!','#4a8fd9')}else{G.sh+=pw;pop(p,'+'+pw+' shield','#4a8fd9')}}
   if(s.recoil){G.hp-=s.recoil;pop(p,'-'+s.recoil,'#d9534f')}
   if(s.exhaust)G.exh=180;updHud()}
 function melee(){if(!G||G.mode!=='fight'||G.mel>0||!has('Weapon Infusion'))return;const p=G.p;G.mel=24;G.swing=10;
@@ -294,7 +297,7 @@ function step(){
         if(G.armor&&a){const m=Math.min(Math.floor(G.mp),a);G.mp-=m;a-=m;if(m)pop(e,'-'+m+' MP','#4a8fd9')}G.hp-=a;
         pop(p,a?'-'+a:'blocked',a?'#d9534f':'#4a8fd9');p.inv=60;G.shake=4;sfx('hurt');burst(p.x+4,p.y+6,'#ff6060',8,1.5);p.vy=-3;const k=p.x<e.x?-12:12;p.x+=k;if(box(p))p.x-=k;
         if(e.tr.includes('drain')){G.mp=Math.max(0,G.mp-6);pop(e,'-6 mana','#4a8fd9')}}}}
-  G.eproj=G.eproj.filter(q=>{q.vy+=q.g||0;q.x+=q.vx;q.y+=q.vy;q.life--;if(q.life<=0||solidAt(q.x+2,q.y+2)){if(q.bomb)explode(q);return false}
+  G.eproj=G.eproj.filter(q=>{q.vy+=q.g||0;q.x+=q.vx;q.y+=q.vy;q.life--;if(G.walls.some(w=>ov({x:q.x,y:q.y,w:4,h:4},w))){burst(q.x,q.y,'#9ad7ff',6,1);return false}if(q.life<=0||solidAt(q.x+2,q.y+2)){if(q.bomb)explode(q);return false}
     if(ov({x:q.x,y:q.y,w:4,h:4},p)){if(q.bomb)explode(q);else if(p.inv<=0)hitPlayer(q.dmg);return false}return true});
   G.fires=G.fires.filter(f=>{f.l--;if(G.t%3===0)G.parts.push({x:f.x+Math.random()*f.w,y:f.y+6,vx:0,vy:-.6-Math.random()*.5,l:20,c:Math.random()<.5?'#ff8030':'#ffd040',s:2});if(ov(f,p)&&p.inv<=0)hitPlayer(Math.max(2,Math.round(3*G.sc)));return f.l>0});
   G.pops=G.pops.filter(o=>--o.l>0);
@@ -342,6 +345,7 @@ function draw(){
   for(const q of G.eproj){const qx=q.x-cam;if(q.arrow){c.fillStyle='#d0b070';c.fillRect(qx-2,q.y+1,7,1);c.fillStyle='#eee';c.fillRect(qx+(q.vx>0?5:-3),q.y,2,3)}
     else if(q.bomb){c.fillStyle='#222';c.fillRect(qx,q.y,5,5);c.fillStyle=G.t%6<3?'#ffd040':'#ff6020';c.fillRect(qx+2,q.y-2,1,2)}
     else{glow(c,qx+2,q.y+2,10,'rgba(255,90,40,.55)');c.fillStyle=q.c||'#ff5030';c.fillRect(qx,q.y,4,4);c.fillStyle='#ffd080';c.fillRect(qx+1,q.y+1,2,2)}}
+  drawShapes(c,cam);
   if(S)glow(c,p.x-cam+4,p.y+6,18,rgba(elc(),.22));
   const ms=p.on&&Math.abs(p.vx)>0&&(G.t/6|0)%2?SPR.me2:SPR.me;
   if(!(p.inv>0&&G.t%6<3)){outline(c,ms,p.x-cam,p.y,1,p.dir<0);spr(c,ms,p.x-cam,p.y,{h:'#3a2f55',s:'#f1c27d',e:'#000',k:'#222',b:'#c9a54a'},S?elc():'#888',1,p.dir<0)}
@@ -367,7 +371,7 @@ function draw(){
   c.restore()
 }
 function finish(won){
-  G.running=0;if(G.story)return finishStory(won);const w=S.wave;
+  G.running=0;if(G.story)return finishStory(won);if(G.awaken)return finishAwaken(won);const w=S.wave;
   if(won){sfx('win');const xp=Math.round(20*Math.pow(1.22,w-1));G.msgs.unshift(`Victory! +${xp} XP for clearing the wave`);gainXP(xp);S.wave++;S.best=Math.max(S.best,S.wave)}
   else{S.wave=Math.max(1,w-2);G.msgs.unshift(`Defeated… you retreat to wave ${S.wave}.`)}
   save();const m=G.msgs;startTown();G.p.x=24*T;
@@ -411,11 +415,11 @@ function sageParse(txt){const t=' '+txt.toLowerCase()+' ';
   if(other)notes.push(`Your grimoire channels ${S.g.el} magic, not ${other}, so I will shape it as ${S.g.el}.`);
   let d=/recoil|hurt (me|myself)|self.?damage|backfire/.test(t)?'recoil':/cooldown|recharge|long wait/.test(t)?'cd':/expensive|costly|lots of mana|more mana/.test(t)?'burn':/exhaust|tired/.test(t)?'exhaust':null;
   if(!d){d=['recoil','cd','burn','exhaust'][(tier+fx.length)%4];notes.push('Every spell needs a drawback, so I picked one for you.')}
-  const s=buildSpell(kind,tier,d,'');s.fx=fx;s.src='forge';if(fx.length){s.cost=Math.round(s.cost*(1+.25*fx.length));s.power=Math.round(s.power*(1-.08*fx.length))}
+  const s=buildSpell(kind,tier,d,'');s.fx=fx;s.src='forge';shapeIt(s,/beam|ray|laser/.test(t)?'beam':/cone|wave|fan/.test(t)?'wave':/orb|orbit|circl/.test(t)?'orb':/trap|mine\b/.test(t)?'trap':/wall|barrier/.test(t)?'wall':'');if(fx.length){s.cost=Math.round(s.cost*(1+.25*fx.length));s.power=Math.round(s.power*(1-.08*fx.length))}
   return{ok:1,spell:s,msg:'Yes, that is possible! '+notes.join(' ')+' It would work like this: '+desc(s)+'.'}}
 let sageLog=[],sagePending=null;
 function screenSage(){if(!S)return;
-  app.innerHTML=`<h1>Spell Sage</h1><div class="card">${sageLog.map(x=>`<p>${x}</p>`).join('')||'<p>🧙 <i>"Describe the spell you dream of and I will tell you whether your grimoire can hold it. I understand effects like pierce, freeze, slow, pull, push, drain, multi, fast and big, plus heals, shields and curses. Name a drawback if you like."</i></p>'}</div>
+  app.innerHTML=`<h1>Spell Sage</h1><div class="card">${sageLog.map(x=>`<p>${x}</p>`).join('')||'<p>🧙 <i>"Describe the spell you dream of and I will tell you whether your grimoire can hold it. I understand effects like pierce, freeze, slow, pull, push, drain, multi, fast and big; shapes like beam, wave, orb, trap and wall; plus heals, shields and curses. Name a drawback if you like."</i></p>'}</div>
   <textarea id="sq" rows="2" maxlength="200" style="width:100%;background:#0e0c14;color:var(--ink);border:1px solid #453d5e;border-radius:6px;padding:6px;font:inherit" placeholder="e.g. a strong beam that pierces and slows enemies"></textarea>
   <button onclick="sageAsk()">Ask the Sage</button><button onclick="sageLog=[];sagePending=null;app.innerHTML=''">Leave</button>
   ${sagePending?`<div class="card">Name it: <input id="sn" maxlength="24"> <button onclick="sageForge()">Forge it (1 Forge point, you have ${S.forgePts})</button><p id="serr" style="color:var(--bad)"></p></div>`:''}`}
@@ -550,7 +554,7 @@ function ambient(){const b=G.bio,px=G.p.x,Rn=Math.random;
   if(b.amb==='ember'&&G.t%3===0)G.parts.push({x:px-170+Rn()*340,y:185,vx:(Rn()-.5)*.4,vy:-.6-Rn()*.6,l:200,c:Rn()<.5?'#ff7030':'#ffc040',s:Rn()<.3?2:1});
   if(b.amb==='snow'&&G.t%2===0)G.parts.push({x:px-180+Rn()*380,y:-4,vx:-.2+(Rn()-.5)*.3,vy:.45+Rn()*.3,l:400,c:'#ffffff',s:Rn()<.3?2:1});
   if(b.amb==='cloud'&&G.t%14===0)G.parts.push({x:px+180,y:20+Rn()*140,vx:-1-Rn(),vy:0,l:400,c:'#c8d4ff',s:2})}
-function hazards(){const p=G.p,b=G.bio;
+function hazards(){const p=G.p,b=G.bio;shapesTick();
   for(const q of G.pages)if(!q.got&&Math.abs(p.x+4-q.x)<10&&Math.abs(p.y+6-q.y)<14){q.got=1;sfx('pick');burst(q.x,q.y,'#fff3b0',14,1.5);say('Page found! ('+G.pages.filter(x=>x.got).length+'/3)')}
   if(b.liq){const cx=Math.floor((p.x+4)/T),cy=Math.min(11,Math.floor((p.y+p.h)/T));
     if(G.grid[cx]&&G.grid[cx][cy]===2&&p.inv<=0){const L=b.liq==='lava';hitPlayer(Math.round(S.hpMax*(L?.12:.07)));p.vy=-7.5;p.inv=50;burst(p.x+4,p.y+12,L?'#ff8030':'#7dff7a',14,2);pop(p,L?'burned!':'poisoned!','#ffb020')}}
@@ -617,6 +621,42 @@ function screenTree(){S.mats=S.mats||{};S.tup=S.tup||{};
   <button onclick="screenHub()">Back</button>`}
 function buyUp(i,id){const s=S.g.spells[i],u=SPELL_UP.find(x=>x.id===id);s.up=s.up||{};const rk=s.up[id]||0;if(rk>=u.ranks||(u.req&&!u.req(s))||!canPay(u.cost[rk]))return;pay(u.cost[rk]);u.apply(s);s.up[id]=rk+1;sfx('level');save();screenTree()}
 function buyTech(n){const t=TECH_UP.find(x=>x.n===n);if(S.tup[n]||!has(t.req)||!canPay(t.cost))return;pay(t.cost);S.tup[n]=1;sfx('level');save();screenTree()}
+
+// ---------- QOL / SHAPES / PACTS ----------
+function screenPause(){if(!G||G.mode!=='fight')return;app.innerHTML=`<h1>Paused</h1><div class="card"><button onclick="app.innerHTML=''">Resume</button><button onclick="app.innerHTML='';leave()">Retreat to town</button>
+  <button onclick="muted=!muted;try{localStorage.setItem('mute',muted?'1':'0')}catch(e){};screenPause()">Sound: ${muted?'off':'on'}</button></div><p class="mute">${$('help').innerHTML}</p>`}
+function screenBackup(){let code='';try{code=btoa(unescape(encodeURIComponent(JSON.stringify(S))))}catch(e){}
+  app.innerHTML=`<h1>Save Backup</h1><div class="card"><p class="mute">Copy this code somewhere safe. To restore, paste a code into the box and press Import. That replaces your current save.</p>
+  <textarea id="bk" rows="5" style="width:100%;background:#0e0c14;color:var(--ink);border:1px solid #453d5e;border-radius:6px;padding:6px;font:12px monospace;word-break:break-all">${code}</textarea>
+  <button onclick="try{navigator.clipboard.writeText($('bk').value);this.textContent='Copied!'}catch(e){}">Copy</button><button onclick="importSave()">Import from box</button><button onclick="screenHub()">Back</button><p id="bkerr" style="color:var(--bad)"></p></div>`}
+function importSave(){try{const o=JSON.parse(decodeURIComponent(escape(atob($('bk').value.trim()))));if(!o||!o.g||!o.g.spells)throw 0;
+  if(!confirm('Replace your current save with this backup?'))return;S=o;S.inv=S.inv||{};save();startTown();app.innerHTML='';say('Save restored!')}catch(e){$('bkerr').textContent='That code is not a valid save.'}}
+const SHAPE_COST={beam:1.2,wave:1.1,orb:1.4,trap:1,wall:1.2};
+function shapeIt(s,sh){if(!sh)return s;if(sh==='wall'?s.kind!=='shield':!(s.kind==='dmg'||s.kind==='dot'))return s;s.shape=sh;s.cost=Math.round(s.cost*SHAPE_COST[sh]);if(sh==='trap')s.cd+=1;return s}
+function shapeCast(s,mk,pw){const p=G.p,sh=s.shape;if(!sh||sh==='wall')return false;const col=EL_COL[s.el||S.g.el]||elc();
+  if(sh==='beam'){const y=p.y+6,x0=p.x+4,q=mk(0,1);q.vx=p.dir;G.en.filter(e=>!e.dead&&Math.abs(e.y+e.h/2-y)<11&&(e.x+4-x0)*p.dir>0&&Math.abs(e.x+4-x0)<170).forEach(e=>applyHit(q,e));
+    G.beams.push({x0,dir:p.dir,y,l:14,col});G.shake=Math.max(G.shake,2);return true}
+  if(sh==='wave'){for(let i=-2;i<=2;i++)G.proj.push(mk(i*.6,24));return true}
+  if(sh==='orb'){const q=mk(0,1);q.dmg=Math.round(pw*.5);G.orbs.push({q,a:0,l:300,col,hit:new Map(),x:p.x,y:p.y});return true}
+  if(sh==='trap'){G.traps.push({q:mk(0,1),x:p.x+4+p.dir*22,y:p.y+p.h-3,l:900,col});return true}
+  return false}
+function shapesTick(){const p=G.p;
+  G.orbs=G.orbs.filter(o=>{o.l--;o.a+=.12;o.x=p.x+4+Math.cos(o.a)*22;o.y=p.y+6+Math.sin(o.a)*16;
+    for(const e of G.en){if(!e.dead&&ov({x:o.x-3,y:o.y-3,w:6,h:6},e)&&!((o.hit.get(e)||0)>G.t)){o.hit.set(e,G.t+30);applyHit(o.q,e)}}return o.l>0});
+  G.traps=G.traps.filter(t=>{t.l--;const e=G.en.find(e=>!e.dead&&Math.abs(e.x+4-t.x)<10&&Math.abs(e.y+e.h-t.y)<14);
+    if(e){G.en.filter(x=>!x.dead&&Math.abs(x.x+4-t.x)<34&&Math.abs(x.y+x.h/2-t.y)<34).forEach(x=>applyHit({...t.q,dmg:Math.round(t.q.dmg*1.3)},x));burst(t.x,t.y,t.col,24,2.5);sfx('kill');G.shake=Math.max(G.shake,4);return false}return t.l>0});
+  G.walls=G.walls.filter(w=>{w.l--;G.en.forEach(e=>{if(!e.dead&&!e.boss&&ov(e,w)){const k=e.x+4<w.x+2?-3:3;e.x+=k;if(box(e))e.x-=k}});return w.l>0})}
+function drawShapes(c,cam){if(!G.beams)return;
+  G.beams=G.beams.filter(b=>{b.l--;c.globalAlpha=Math.max(0,b.l/14);c.fillStyle=b.col;const x=(b.dir>0?b.x0:b.x0-170)-cam;c.fillRect(x,b.y-2,170,4);c.fillStyle='#fff';c.fillRect(x,b.y-1,170,1);c.globalAlpha=1;glow(c,b.x0-cam,b.y,14,'rgba(255,255,255,.4)');return b.l>0});
+  for(const o of G.orbs){glow(c,o.x-cam,o.y,10,'rgba(255,255,255,.35)');c.fillStyle=o.col;c.fillRect(o.x-cam-3,o.y-3,6,6);c.fillStyle='#fff';c.fillRect(o.x-cam-1,o.y-1,2,2)}
+  for(const t of G.traps){c.fillStyle=t.col;c.fillRect(t.x-cam-5,t.y,10,3);if(G.t%30<15){c.fillStyle='#fff';c.fillRect(t.x-cam-1,t.y-1,2,1)}glow(c,t.x-cam,t.y+1,8,'rgba(255,255,255,.2)')}
+  for(const w of G.walls){c.globalAlpha=.55;c.fillStyle=w.col;c.fillRect(w.x-cam,w.y,w.w,w.h);c.globalAlpha=1;c.fillStyle='#fff';c.fillRect(w.x-cam+2,w.y,1,w.h)}}
+function restrict(){if((S.restr||0)>=3)return;if(!confirm('Permanently lose 10% max HP for +8% power on all your current spells?'))return;
+  S.restr=(S.restr||0)+1;S.hpMax=Math.round(S.hpMax*.9);S.g.spells.forEach(s=>s.power=Math.round(s.power*1.08));sfx('boss');save();screenForge()}
+function startAwaken(){startFight({w:Math.max(10,Math.min(S.lv,30)),obj:'boss',awaken:1})}
+function finishAwaken(won){const g=G;if(won){sfx('win');S.awake=1;S.g.name='Awakened '+S.g.name;S.g.mult*=1.25;S.g.spells.forEach(s=>s.power=Math.round(s.power*1.25));S.forgePts++;
+    g.msgs.unshift('<b style="color:#ffd700">YOUR MAGIC AWAKENS!</b> All spells +25% power and +1 Forge point.')}else g.msgs.unshift('Your shadow was too strong. Return when you are ready.');
+  save();const m=g.msgs;startTown();G.p.x=4*T;app.innerHTML=`<h1>${won?'Awakened!':'Defeated'}</h1><div class="card">${m.map(x=>`<div>${x}</div>`).join('')}<button onclick="app.innerHTML=''">Back to town</button></div>`}
 if(S)S.inv=S.inv||{};
 startTown();
 </script></body></html>
