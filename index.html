@@ -102,7 +102,7 @@ function screenHub(){
   <p>Level ${S.lv} · XP ${S.xp}/${need} · HP ${S.hpMax} · Mana ${S.mpMax} · Best wave ${S.best}</p>${bar(S.xp,need,'var(--acc)')}
   ${spellList(g.spells)}<p><b>Rank:</b> ${RANKS[rankIdx()][0]} ★${S.stars||0}${S.squad?' · <b style="color:'+SQ[S.squad].col+'">'+SQ[S.squad].n+'</b>':''}</p><p><b>Story:</b> ${storyLine()}</p>${S.pact?'<p><b>Pact:</b> '+(S.pact==='spirit'?'Spirit':'Dark')+' (press T in battle)</p>':''}<p><b>Techniques</b> <span class="mute">(unlock by leveling)</span></p>${TECH.map(t=>`<div class="${S.lv>=t[1]?"":"mute"}">${S.lv>=t[1]?"✔":"🔒 Lv "+t[1]} <b>${t[0]}</b> — ${t[2]}</div>`).join("")}<p><b>Combos</b> <span class="mute">(cast two different spells within 1s)</span></p><div class="mute">${Object.entries(COMBOS).map(([k,v])=>`<b>${v}</b>: ${k.split('>').map(x=>KN[x]).join(' → ')} (${COMBO_INFO[v]})`).join('<br>')}</div><p class="mute">Materials: ${Object.entries(S.mats||{}).filter(x=>x[1]).map(([k,v])=>k+' ×'+v).join(', ')||'none yet (enemies drop them)'}</p><p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
   <button onclick="startFight()">Fight wave ${S.wave}</button>
-  <button onclick="screenTree()">Skill Trees</button><button onclick="screenBackup()">Backup</button><button onclick="screenLoadout()">Builds (using ${(S.bi||0)+1})</button><button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
+  <button onclick="screenPages()">📜 Page Binding</button><button onclick="screenTree()">Skill Trees</button><button onclick="screenBackup()">Backup</button><button onclick="screenLoadout()">Builds (using ${(S.bi||0)+1})</button><button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
   <button onclick="if(confirm('Abandon this grimoire and retake the trial?')){localStorage.removeItem('grimoire');S=null;app.innerHTML=''}">New grimoire</button><button onclick="app.innerHTML=''">Close</button></p>
   <p class="mute">Walk to the Spell Forge or Wave Portal in town to use them. You earn 1 Forge point every 3 levels, and your grimoire grants a new spell every 2 levels. Visit the Spell Sage in town to design spells by describing them. Enemies grow ~18% stronger every wave. Every 5th wave has a boss.</p></div>`;
 }
@@ -119,7 +119,7 @@ function screenForge(){
   <p>Required drawback: <select id="fd" onchange="prev()"><option value="recoil">Recoil — hurts you</option><option value="cd">Long cooldown</option><option value="burn">Mana burn — costs much more</option><option value="exhaust">Exhaustion — no regen for 3s</option></select></p>
   <p>Catalyst (optional, consumed): <select id="fc" onchange="prev()"><option value="">None</option>${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<option value="${k}">${k} ×${v} — ${ITEMS[k]}</option>`).join('')}</select></p>
   <p id="fprev" class="card"></p><p id="ferr" style="color:var(--bad)"></p>
-  <button onclick="forge()">Forge spell</button><button onclick="screenHub()">Back</button></div>
+  <button onclick="forge()">Forge spell</button><button onclick="screenPages()">📜 Page Binding</button><button onclick="screenHub()">Back</button></div>
   <div class="card"><b>Restriction Pact</b> (${S.restr||0}/3)<p class="mute">Permanently give up 10% of your max HP for +8% power on every spell you own.</p><button ${(S.restr||0)>=3?'disabled':''} onclick="restrict()">Make the pact</button></div>`;prev();
 }
 function forgeSpell(){return shapeIt(buildSpell($('fk').value,+$('fp').value+($('fc').value==='Star Dust'?2:0),$('fd').value,$('fc').value),$('fsh').value)}
@@ -209,6 +209,8 @@ function startFight(){
   if(S.squad==='wardens')G.sh=20+S.lv*2;
   G.killGoal=Math.ceil(en.filter(e=>!e.boss).length*.7);
   if(G.obj==='pages'||G.obj==='chests')for(let i=0;i<3;i++){let cx=Math.floor(cols*(.22+.25*i)+r()*4);for(let k=0;k<8&&!grid[cx].includes(1);k++)cx++;const top=grid[cx].indexOf(1);G.pages.push({x:cx*T+8,y:(top<0?9:top)*T-(G.obj==='chests'?6:r()<.5?14:40),got:0,chest:G.obj==='chests'})}
+  G.frags=[];{const nf=1+(r()<.5?1:0)+(w>10?1:0);for(let i=0;i<nf;i++){let cx=Math.floor(cols*(.15+.7*r()));for(let k=0;k<8&&!grid[cx].includes(1);k++)cx++;const top=grid[cx].indexOf(1);
+    G.frags.push(Object.assign({x:cx*T+8,y:(top<0?9:top)*T-22,got:0},rollFrag(Math.min(1,w/30))))}}
   G.sp.forEach(s=>s.cur=0);
   music('fight');app.innerHTML='';$('ttl').textContent=st?(st.rival?'Rival Duel: '+RIVAL:st.dungeon?'Forgotten Crypt (Dungeon)':st.awaken?'Awakening Trial':st.final?'The Hollow Citadel — Final Battle':`${bio.n} — Stage ${st.story.s+1}/4`):`Wave ${w} · ${bio.n}${boss?' — BOSS':''}`;
   hudButtons();
@@ -251,8 +253,10 @@ function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.
   let combo=null,xfx=[],det=0;if(G.lastCast&&G.t-G.lastCast.t<60&&G.lastCast.i!==i)combo=COMBOS[G.lastCast.k+'>'+s.kind];G.lastCast={i,k:s.kind,t:G.t};
   if(combo){G.combos=(G.combos||0)+1;say('COMBO: '+combo+'!');sfx('combo');burst(p.x+4,p.y+6,'#ffd700',14,2);if(/Chain/.test(combo))pw*=1.3;if(/Sanctuary|Second/.test(combo))pw*=1.5;if(/Deep/.test(combo))pw*=2;
     if(/Bulwark/.test(combo))xfx.push('pierce');if(/Life/.test(combo))xfx.push('drain');if(/Plague/.test(combo))xfx.push('multi');if(/Detonation/.test(combo))det=1;pw=Math.round(pw);G.lastCast=null}
-  if(s.kind==='dmg'||s.kind==='dot'){const fx=[...(s.fx||[]),...xfx];const AV=aimVec();const mk=(vy,life)=>({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:AV.x*(fx.includes('fast')?6.5:4),vy:vy+AV.y*(fx.includes('fast')?6.5:4),sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life});
-  if(!shapeCast(s,mk,pw))for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:AV.x*(fx.includes('fast')?6.5:4),vy:vy+AV.y*(fx.includes('fast')?6.5:4),sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
+  const n0=G.proj.length;
+  if(s.kind==='dmg'||s.kind==='dot'){const fx=[...(s.fx||[]),...xfx];const AV=aimVec();const mk=(vy,life)=>({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:AV.x*(fx.includes('fast')?6.5:4),vy:vy+AV.y*(fx.includes('fast')?6.5:4),sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,dotMul:s.dotMul,fx,life});
+  if(!shapeCast(s,mk,pw))for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:AV.x*(fx.includes('fast')?6.5:4),vy:vy+AV.y*(fx.includes('fast')?6.5:4),sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,dotMul:s.dotMul,fx,life:90})}
+  if((s.fx||[]).includes('echo'))G.proj.slice(n0).forEach(q=>G.proj.push({...q,wait:18,hit:null}));
   if(s.kind==='heal'){const hv=Math.round(pw*(S.squad==='hearts'?1.3:1));G.hp=Math.min(S.hpMax,G.hp+hv);pop(p,'+'+hv,'#4caf7d')}
   if(s.kind==='shield'){if(s.shape==='wall'){G.walls.push({x:p.x+(p.dir>0?12:-8),y:p.y-14,w:5,h:28,l:360,col:elc()});pop(p,'barrier!','#4a8fd9')}else{const sv=Math.round(pw*(S.squad==='wardens'?1.25:1));G.sh+=sv;pop(p,'+'+sv+' shield','#4a8fd9')}}
   if(s.kind==='summon'){if(G.fams.filter(f=>!f.spirit).length>=2)G.fams.splice(G.fams.findIndex(f=>!f.spirit),1);G.fams.push({x:p.x,y:p.y-10,l:720,dmg:pw,el:s.el||S.g.el,cd:20});pop(p,'familiar!','#ffd700')}
@@ -297,7 +301,7 @@ function step(){
   if(G.armor){G.mp-=(tup('Mana Skin')?1:2)/60;if(G.mp<=0){G.mp=0;G.armor=false;say('Mana Armor broke!')}}
   G.field--;G.fieldCd--;G.mel--;G.swing--;G.dashCd--;if(S.squad==='hearts')G.hp=Math.min(S.hpMax,G.hp+1/60);
   G.sp.forEach(s=>s.cur>0&&s.cur--);G.gcd--;p.inv--;if(G.bT>0)G.bT--;
-  G.proj=G.proj.filter(q=>{if(G.t%2===0)G.parts.push({x:q.x+q.sz/2,y:q.y+q.sz/2,vx:-q.vx*.1+(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,l:16,c:q.dot?'#a6e22e':elc(),s:2});if(q.home){const t=G.en.filter(e=>!e.dead&&Math.abs(e.x-q.x)<100).sort((a,b)=>Math.abs(a.x-q.x)-Math.abs(b.x-q.x))[0];
+  G.proj=G.proj.filter(q=>{if(q.wait>0){q.wait--;return true}if(G.t%2===0)G.parts.push({x:q.x+q.sz/2,y:q.y+q.sz/2,vx:-q.vx*.1+(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,l:16,c:q.dot?'#a6e22e':elc(),s:2});if(q.home){const t=G.en.filter(e=>!e.dead&&Math.abs(e.x-q.x)<100).sort((a,b)=>Math.abs(a.x-q.x)-Math.abs(b.x-q.x))[0];
       if(t)q.vy=Math.max(-2,Math.min(2,q.vy+Math.sign(t.y+t.h/2-q.y)*.3))}
     q.x+=q.vx;q.y+=q.vy;q.life--;if(q.life<=0||solidAt(q.x+2,q.y+1))return false;
     const e=G.en.find(e=>!e.dead&&!(q.hit&&q.hit.includes(e))&&ov({x:q.x,y:q.y,w:q.sz,h:q.sz-1},e));if(e){applyHit(q,e);if(!q.fx.includes('pierce'))return false;(q.hit=q.hit||[]).push(e)}return true});
@@ -356,13 +360,14 @@ function draw(){
     if(ns&&!busy()){c.font='bold 8px monospace';c.fillStyle='#ffd700';c.textAlign='center';c.fillText('[E] '+ns.name,ns.x*T-cam+8,9*T-50);c.textAlign='left'}}
   else{const fx=G.flagX-cam,locked=G.en.some(e=>e.boss&&!e.dead)||!objDone();
   c.fillStyle='#ccc';c.fillRect(fx,G.flagY-56,2,56);c.fillStyle=locked?'#d9534f':'#ffd700';for(let i=0;i<8;i++)c.fillRect(fx+2,G.flagY-56+i,12-i*1.5,1)}
+  for(const q of (G.frags||[]))if(!q.got){const y=q.y+Math.sin(G.t/12+q.x)*2,col=RAR_COL[q.rar];glow(c,q.x-cam,y,11,'rgba(255,255,255,.4)');c.fillStyle=col;c.fillRect(q.x-cam-3,y-4,6,8);c.fillStyle='#f5ecd0';c.fillRect(q.x-cam-2,y-3,4,6);c.fillStyle=col;c.fillRect(q.x-cam-2,y-1,4,1)}
   for(const q of (G.pages||[]))if(!q.got){if(q.chest){const x=q.x-cam-5,y=q.y-2;glow(c,x+5,y+3,12,'rgba(255,210,90,.35)');c.fillStyle='#7a4a20';c.fillRect(x,y,10,8);c.fillStyle='#ffd040';c.fillRect(x,y+3,10,1);c.fillRect(x+4,y+2,2,3);continue}const y=q.y+Math.sin(G.t/15)*2;glow(c,q.x-cam,y,12,'rgba(255,240,170,.5)');c.fillStyle='#f5ecd0';c.fillRect(q.x-cam-3,y-4,6,8);c.fillStyle='#8a7a5a';c.fillRect(q.x-cam-2,y-2,4,1);c.fillRect(q.x-cam-2,y,4,1)}
   for(const e of G.en){if(e.dead)continue;const x=e.x-cam;if(x<-20||x>W+20)continue;
     const ey=e.y+(e.on&&Math.sin(G.t/5+e.x)>.7?1:0);c.fillStyle='rgba(0,0,0,.3)';c.fillRect(x+1,e.y+e.h-1,e.w-2,2);const ES=eSpr(e);if(e.type==='ghost')c.globalAlpha=e.vis?.85:.22;outline(c,ES[0],x,ey,e.boss?2:1,e.vx<0);spr(c,ES[0],x,ey,ES[1],e.wind>0&&G.t%6<3?'#fff':e.frz>0?'#9ee7ff':e.col,e.boss?2:1,e.vx<0);c.globalAlpha=1;
     if(e.boss){c.fillStyle='#eee';c.fillRect(x+2,e.y-3,2,4);c.fillRect(x+12,e.y-3,2,4)}if(e.ward){c.strokeStyle='#7ddc6a';c.strokeRect(x-2.5,e.y-2.5,e.w+5,e.h+5)}if(e.sealT>0){c.strokeStyle='#e0c0ff';c.strokeRect(x-1.5,e.y-1.5,e.w+3,e.h+3);c.fillStyle='#e0c0ff';c.fillRect(x+e.w/2-1,e.y-8,2,2)}
     c.fillStyle='#000';c.fillRect(x,e.y-4,e.w,2);c.fillStyle='#d9534f';c.fillRect(x,e.y-4,e.w*Math.max(0,e.hp)/e.hpMax,2);
     c.font='8px monospace';c.fillStyle='#ffb020';c.fillText((e.boss?e.name+' ':'')+(has('Mana Sense')?e.tr.map(t=>t[0].toUpperCase()).join('')+' '+Math.ceil(e.hp):e.tr.length?'?':''),x,e.y-6)}
-  for(const q of G.proj){const col=q.dot?'#a6e22e':(EL_COL[q.el]||elc());glow(c,q.x-cam+q.sz/2,q.y+q.sz/2,8+q.sz,rgba(col,.6));c.fillStyle=col;c.fillRect(q.x-cam,q.y,q.sz,q.sz-1);c.fillStyle='#fff';c.fillRect(q.x-cam+1,q.y+1,Math.max(1,q.sz-3),Math.max(1,q.sz-3))}
+  for(const q of G.proj){if(q.wait>0)continue;const col=q.dot?'#a6e22e':(EL_COL[q.el]||elc());glow(c,q.x-cam+q.sz/2,q.y+q.sz/2,8+q.sz,rgba(col,.6));c.fillStyle=col;c.fillRect(q.x-cam,q.y,q.sz,q.sz-1);c.fillStyle='#fff';c.fillRect(q.x-cam+1,q.y+1,Math.max(1,q.sz-3),Math.max(1,q.sz-3))}
   for(const q of G.eproj){const qx=q.x-cam;if(q.arrow){c.fillStyle='#d0b070';c.fillRect(qx-2,q.y+1,7,1);c.fillStyle='#eee';c.fillRect(qx+(q.vx>0?5:-3),q.y,2,3)}
     else if(q.bomb){c.fillStyle='#222';c.fillRect(qx,q.y,5,5);c.fillStyle=G.t%6<3?'#ffd040':'#ff6020';c.fillRect(qx+2,q.y-2,1,2)}
     else{glow(c,qx+2,q.y+2,10,'rgba(255,90,40,.55)');c.fillStyle=q.c||'#ff5030';c.fillRect(qx,q.y,4,4);c.fillStyle='#ffd080';c.fillRect(qx+1,q.y+1,2,2)}}
@@ -461,7 +466,12 @@ function applyHit(q,e){const f=q.fx,dir=G.p.x<e.x?1:-1;
   if(q.det&&e.dotT>0){const b=e.dot*Math.ceil(e.dotT/60);e.dotT=0;pop(e,'DETONATE','#ffb020');hurt(e,b);G.shake=Math.max(G.shake,5)}
   if(q.dot){e.dot=Math.round(q.dmg*affMul(q.el,e));e.dotT=180;pop(e,'cursed','#a6e22e')}
   else{const m=affMul(q.el,e),d=Math.round(q.dmg*(0.9+Math.random()*.2)*m);if(m>1)pop(e,'WEAK!','#ffd700');else if(m<1)pop(e,'resist','#aaa');hurt(e,d);if(f.includes('drain')){const h=Math.max(1,Math.round(d*.3));G.hp=Math.min(S.hpMax,G.hp+h);pop(G.p,'+'+h,'#4caf7d')}}
-  if(f.includes('freeze')){e.frz=120;pop(e,'frozen','#9ee7ff')}else if(f.includes('slow'))e.slw=240;
+  const L=f.includes('linger')?2:1;
+  if(f.includes('poison')||f.includes('burn')){e.dot=Math.max(e.dot||0,Math.round(q.dmg*(q.dotMul||.25)));e.dotT=180*L}
+  if(!q.sub&&f.includes('area')){G.en.filter(x=>x!==e&&!x.dead&&Math.abs(x.x-e.x)<34&&Math.abs(x.y-e.y)<34).forEach(x=>applyHit({...q,dmg:Math.round(q.dmg*.7),sub:1},x));burst(e.x+4,e.y+4,'#ffb060',20,2.2);G.shake=Math.max(G.shake,3)}
+  if(!q.sub&&f.includes('chain')){let cur=e;const hs=new Set([e]);for(let k=0;k<2;k++){const nx=G.en.filter(x=>!x.dead&&!hs.has(x)&&Math.abs(x.x-cur.x)<80&&Math.abs(x.y-cur.y)<60).sort((a,b)=>Math.abs(a.x-cur.x)-Math.abs(b.x-cur.x))[0];if(!nx)break;hs.add(nx);
+    for(let j=0;j<6;j++)G.parts.push({x:cur.x+4+(nx.x-cur.x)*j/6,y:cur.y+4+(nx.y-cur.y)*j/6,vx:0,vy:0,l:12,c:'#9ad7ff',s:2});applyHit({...q,dmg:Math.round(q.dmg*.6),sub:1},nx);cur=nx}}
+  if(f.includes('freeze')){e.frz=120*L;pop(e,'frozen','#9ee7ff')}else if(f.includes('slow'))e.slw=240*L;
   const k=f.includes('pull')?-24:f.includes('push')?24:0;if(k){e.x+=dir*k;if(box(e))e.x-=dir*k}}
 
 // ---------- MOVEMENT & BOSSES ----------
@@ -581,7 +591,8 @@ function ambient(){const b=G.bio,px=G.p.x,Rn=Math.random;
   if(b.amb==='ember'&&G.t%3===0)G.parts.push({x:px-170+Rn()*340,y:185,vx:(Rn()-.5)*.4,vy:-.6-Rn()*.6,l:200,c:Rn()<.5?'#ff7030':'#ffc040',s:Rn()<.3?2:1});
   if(b.amb==='snow'&&G.t%2===0)G.parts.push({x:px-180+Rn()*380,y:-4,vx:-.2+(Rn()-.5)*.3,vy:.45+Rn()*.3,l:400,c:'#ffffff',s:Rn()<.3?2:1});
   if(b.amb==='cloud'&&G.t%14===0)G.parts.push({x:px+180,y:20+Rn()*140,vx:-1-Rn(),vy:0,l:400,c:'#c8d4ff',s:2})}
-function hazards(){const p=G.p,b=G.bio;shapesTick();autoMelee();
+function hazards(){const p=G.p,b=G.bio;
+  for(const q of (G.frags||[]))if(!q.got&&Math.abs(p.x+4-q.x)<10&&Math.abs(p.y+6-q.y)<14){q.got=1;burst(q.x,q.y,RAR_COL[q.rar],16,1.6);gainFrag(q)}shapesTick();autoMelee();
   for(const q of G.pages)if(!q.got&&Math.abs(p.x+4-q.x)<10&&Math.abs(p.y+6-q.y)<14){q.got=1;sfx('pick');burst(q.x,q.y,'#fff3b0',14,1.5);say((q.chest?'Chest opened! ':'Page found! ')+'('+G.pages.filter(x=>x.got).length+'/3)');if(q.chest)chestLoot(q)}
   if(b.liq){const cx=Math.floor((p.x+4)/T),cy=Math.min(11,Math.floor((p.y+p.h)/T));
     if(G.grid[cx]&&G.grid[cx][cy]===2&&p.inv<=0){const L=b.liq==='lava';hitPlayer(Math.round(S.hpMax*(L?.12:.07)));p.vy=-7.5;p.inv=50;burst(p.x+4,p.y+12,L?'#ff8030':'#7dff7a',14,2);pop(p,L?'burned!':'poisoned!','#ffb020')}}
@@ -789,7 +800,41 @@ function embedMenu(){const q=new URLSearchParams(location.search),m=q.get('menu'
   const b=document.createElement('button');b.textContent='⟵ Return to the 3D world';b.style.cssText='position:fixed;right:12px;bottom:12px;z-index:9;padding:12px 16px;border:1px solid #c9a54a;font-weight:700';
   const back=()=>{if(S)save();parent.postMessage('g3d-close','*')};b.onclick=back;document.body.appendChild(b);document.body.classList.add('embed');if(G)G.running=0;
   new MutationObserver(()=>{if(!app.childElementCount)back()}).observe(app,{childList:true});addEventListener('keydown',e=>{if(e.key==='Escape')back()});
-  if(!S)return;const map={hub:screenHub,forge:screenForge,sage:screenSage,tree:screenTree,builds:screenLoadout,hall:screenHall,shrine:screenStart};(map[m]||screenHub)()}
+  if(!S)return;const map={pages:screenPages,hub:screenHub,forge:screenForge,sage:screenSage,tree:screenTree,builds:screenLoadout,hall:screenHall,shrine:screenStart};(map[m]||screenHub)()}
+
+// ---------- GRIMOIRE PAGE FRAGMENTS & PAGE BINDING ----------
+const PTRAITS=[
+ {id:'bolt',n:'Bolt',type:'Form',d:'a single fast shot'},{id:'area',n:'Area',type:'Form',d:'explodes and hits everything around the target'},{id:'beam',n:'Beam',type:'Form',d:'an instant line through enemies'},
+ {id:'wave',n:'Wave',type:'Form',d:'a cone of 5 short shots'},{id:'orb',n:'Orb',type:'Form',d:'circles around you'},{id:'trap',n:'Trap',type:'Form',d:'explodes when stepped on'},{id:'summon',n:'Summon',type:'Form',d:'a familiar that fights for you'},
+ {id:'poison',n:'Poison',type:'Effect',d:'damage over time'},{id:'burn',n:'Burn',type:'Effect',d:'damage over time'},{id:'freeze',n:'Freeze',type:'Effect',d:'stops enemies'},{id:'slow',n:'Slow',type:'Effect',d:'slows enemies'},
+ {id:'drain',n:'Life Steal',type:'Effect',d:'heals you for part of the damage'},{id:'pierce',n:'Pierce',type:'Effect',d:'passes through enemies'},{id:'pull',n:'Pull',type:'Effect',d:'drags enemies toward you'},{id:'push',n:'Push',type:'Effect',d:'knocks enemies away'},
+ {id:'chain',n:'Chain',type:'Effect',d:'jumps to 2 more enemies'},{id:'multi',n:'Multi-shot',type:'Effect',d:'3 shots instead of 1'},
+ {id:'big',n:'Big',type:'Modifier',d:'larger and 15% stronger'},{id:'fast',n:'Fast',type:'Modifier',d:'much faster shots'},{id:'linger',n:'Lingering',type:'Modifier',d:'effects last twice as long'},{id:'echo',n:'Echo',type:'Modifier',d:'casts again a moment later'}];
+const RAR=['Common','Uncommon','Rare','Epic','Legendary'],RAR_COL=['#e8e8e8','#5fd068','#3da5ff','#c070ff','#ffd700'],RANK_PTS=[3,8,15,25,40];
+const PB={sel:{form:'bolt',mods:[]}};
+function pageRank(id){const p=(S.pageP&&S.pageP[id])||0;let r=0;RANK_PTS.forEach((v,i)=>{if(p>=v)r=i+1});return id==='bolt'?Math.max(1,r):r}
+function rollFrag(b){const w=[50,28,14,6,2].map((v,k)=>v*(1+b*k*1.5)),tot=w.reduce((a,x)=>a+x,0);let v=Math.random()*tot,rar=0;for(;rar<4;rar++){if((v-=w[rar])<0)break}
+  return{trait:PTRAITS[Math.floor(Math.random()*PTRAITS.length)].id,rar}}
+function gainFrag(q){S.pageP=S.pageP||{};const t=PTRAITS.find(x=>x.id===q.trait),b=pageRank(q.trait);S.pageP[q.trait]=(S.pageP[q.trait]||0)+q.rar+1;const a=pageRank(q.trait);
+  pop(G.p,RAR[q.rar]+' '+t.n+' fragment',RAR_COL[q.rar]);sfx('pick');if(a>b)say((b?t.n+' page ranked up to '+RAR[a-1]:'New page bound: '+t.n+' ('+RAR[a-1]+')')+'!',1);save()}
+function craftPreview(sel){const ids=[sel.form,...sel.mods],sum=ids.reduce((a,id)=>a+pageRank(id),0),lvl=1+S.lv*.06,f=sel.form;
+  const s={name:'',kind:f==='summon'?'summon':'dmg',power:Math.round(12*(S.g.mult||1)*lvl*(1+.1*sum)),cost:6+4*sel.mods.length+2*sum+({area:4,beam:3,orb:5,trap:2,summon:6,wave:3}[f]||0),
+    cd:+(.4*sel.mods.length+({area:1,beam:1,orb:2,trap:2,summon:3,wave:.5}[f]||0)).toFixed(1),recoil:0,cur:0,src:'forge',fx:[]};
+  if(['beam','wave','orb','trap'].includes(f))s.shape=f;if(f==='area')s.fx.push('area');for(const m of sel.mods)s.fx.push(m);
+  s.dotMul=+(.2+.05*Math.max(pageRank('poison'),pageRank('burn'))).toFixed(2);if(sel.mods.includes('big'))s.power=Math.round(s.power*1.15);if(sel.mods.includes('echo'))s.cost=Math.round(s.cost*1.6);return s}
+function pbToggle(id){const m=PB.sel.mods,k=m.indexOf(id);if(k>=0)m.splice(k,1);else if(m.length<pbMax())m.push(id);screenPages()}
+function pbMax(){return 2+Math.floor(S.lv/5)}
+function pbCraft(){const n=$('pbn').value.trim().replace(/\s+/g,' '),er=m=>$('pberr').textContent=m;if(!/^[A-Za-z ]{3,24}$/.test(n))return er('Name must be 3–24 letters.');if(BANNED.test(n))return er('Please choose a family-friendly name.');
+  if(S.g.spells.length>=16)return er('Your grimoire is full (16 spells).');const s=craftPreview(PB.sel);s.name=n;s.el=S.g.el;S.g.spells.push(s);fixLoad();if(S.load.length<4)S.load.push(S.g.spells.length-1);save();sfx('level');
+  PB.sel={form:'bolt',mods:[]};screenPages();$('pberr').style.color='var(--good)';$('pberr').textContent='"'+n+'" is bound into your grimoire! Equip it in Builds.'}
+function screenPages(){S.pageP=S.pageP||{};const sel=PB.sel;if(!pageRank(sel.form))sel.form='bolt';sel.mods=sel.mods.filter(m=>pageRank(m));
+  const rows=['Form','Effect','Modifier'].map(ty=>'<p style="margin:8px 0 2px"><b>'+ty+'s</b></p>'+PTRAITS.filter(t=>t.type===ty).map(t=>{const pts=S.pageP[t.id]||0,rk=pageRank(t.id),nx=RANK_PTS[rk];
+    return '<div style="margin:2px 0"><b style="color:'+(rk?RAR_COL[rk-1]:'#6a6480')+'">'+t.n+'</b> '+(rk?'<span class="tag">'+RAR[rk-1]+'</span>':'<span class="mute">not bound</span>')+' <span class="mute">'+t.d+(t.id==='bolt'&&!pts?'':' · '+pts+(nx?'/'+nx:'')+' pts')+'</span></div>'}).join('')).join('');
+  const forms=PTRAITS.filter(t=>t.type==='Form'&&pageRank(t.id)),mods=PTRAITS.filter(t=>t.type!=='Form'&&pageRank(t.id)),pv=craftPreview(sel),hl='style="border-color:#ffd27a;color:#ffd27a"';
+  app.innerHTML='<h1>Page Binding</h1><div class="card"><p class="mute">Glowing page fragments appear in levels and around the 3D world. Each fragment gives points to its trait (Common 1 · Uncommon 2 · Rare 3 · Epic 4 · Legendary 5). Enough points bind a page, and more points rank it up from Common to Legendary.</p>'+rows+'</div>'+
+   '<div class="card"><b>Craft a spell</b><p>Form: '+forms.map(t=>'<button onclick="PB.sel.form=\''+t.id+'\';screenPages()" '+(sel.form===t.id?hl:'')+'>'+t.n+'</button>').join(' ')+'</p>'+
+   '<p>Traits (up to '+pbMax()+' at level '+S.lv+', +1 every 5 levels; each one adds mana cost): '+(mods.map(t=>'<button onclick="pbToggle(\''+t.id+'\')" '+(sel.mods.includes(t.id)?hl:'')+'>'+(sel.mods.includes(t.id)?'✔ ':'')+t.n+'</button>').join(' ')||'<span class="mute">none yet. Collect fragments!</span>')+'</p>'+
+   '<p>Result: <b>'+desc(pv)+'</b></p><p>Name: <input id="pbn" maxlength="24"> <button onclick="pbCraft()">Bind spell</button></p><p id="pberr" style="color:var(--bad)"></p></div><button onclick="screenHub()">Back</button>'}
 if(S)S.inv=S.inv||{};
 startTown();embedMenu();
 </script></body></html>

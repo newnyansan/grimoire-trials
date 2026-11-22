@@ -104,7 +104,7 @@ for(const s of ZONES){const y=H(s.x,s.z);s.base=new THREE.Group();scene.add(s.ba
   for(let i=0;i<6;i++){const st=new THREE.Mesh(new THREE.DodecahedronGeometry(.45),mat('#6a6070'));const a=i/6*6.283;st.position.set(s.x+Math.cos(a)*1.4,y+.25,s.z+Math.sin(a)*1.4);s.base.add(st)}
   const fire=new THREE.Mesh(new THREE.ConeGeometry(.9,2.4,8),new THREE.MeshBasicMaterial({color:'#ffae3a'}));fire.position.set(s.x,y+1.2,s.z);s.base.add(fire);s.fire=fire;addObst(s.x,s.z,1.6);
   const L=new THREE.PointLight('#ffb060',80,s.r*2.6,1.6);L.position.set(s.x,y+4,s.z);s.base.add(L);s.light=L}
-const BLD=[['Grimoire Lectern','hub'],['Spell Forge','forge'],['Spell Sage','sage'],['Skill Library','tree'],['Knight Hall','hall'],['Trial Shrine','shrine']],HOUSES=[];
+const BLD=[['Grimoire Lectern','hub'],['Spell Forge','forge'],['Spell Sage','sage'],['Page Binding','pages'],['Knight Hall','hall'],['Trial Shrine','shrine']],HOUSES=[];
 for(let i=0;i<6;i++){const a=i/6*Math.PI*2+.3,x=Math.cos(a)*16,z=Math.sin(a)*16,y=H(x,z);
   const house=new THREE.Mesh(new THREE.BoxGeometry(5,4,5),mat(['#6a4a58','#5a4a6a','#6a5a4a'][i%3]));house.position.set(x,y+2,z);house.rotation.y=-a;house.castShadow=house.receiveShadow=true;scene.add(house);
   const roof=new THREE.Mesh(new THREE.ConeGeometry(4.3,3,4),mat('#2a1d3a'));roof.position.set(x,y+5.5,z);roof.rotation.y=-a+Math.PI/4;roof.castShadow=true;scene.add(roof);addObst(x,z,3.4);HOUSES.push({x,z,n:BLD[i][0],menu:BLD[i][1]});scene.add(sign(BLD[i][0],x,y+8.4,z))}
@@ -207,20 +207,40 @@ function castSlot(i){const s=SP[i];if(!s||P.dead||$('start')||CD[i]>0)return;if(
   else if(s.kind==='shield'){P.sh+=pw;burst(from,'#4a8fd9',20,5);num(new THREE.Vector3(P.x,P.y+3.4,P.z),'+'+pw+' shield','#9ad7ff')}
   else if(s.kind==='summon'){if(familiars.length>=2)killFam(familiars[0]);const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.4,0),mat(col,{emissive:col,emissiveIntensity:1}));scene.add(m);familiars.push({m,l:12,cd:.5,dmg:pw,col})}
   else if(s.kind==='seal'){const t=target(from);if(t){t.frz=t.champ?1:3;t.sealT=t.frz;burst(new THREE.Vector3(t.x,t.y+t.cy,t.z),'#e0c0ff',20,6);num(new THREE.Vector3(t.x,t.y+t.cy*2+1.5,t.z),'SEALED','#e0c0ff')}}
-  else{const dot=s.kind==='dot',d=aimDir(from),spd=fx.includes('fast')?60:40,r=(oc?.7:.5)+(fx.includes('big')?.35:0),info={dmg:pw,dot,fx,col};
+  else{const dot=s.kind==='dot',d=aimDir(from),spd=fx.includes('fast')?60:40,r=(oc?.7:.5)+(fx.includes('big')?.35:0),info={dmg:pw,dot,fx,col,dotMul:s.dotMul};
     if(s.shape==='beam'){const end=from.clone().addScaledVector(d,45);for(const e of [...enemies]){const ep=new THREE.Vector3(e.x,e.y+e.cy,e.z),t=ep.clone().sub(from).dot(d);if(t<0||t>45)continue;
         if(from.clone().addScaledVector(d,t).distanceTo(ep)<e.r+1)applyHit(e,info)}beamFx(from,end,col)}
     else if(s.shape==='wave'){for(let k=-2;k<=2;k++)shoot(from,d.clone().applyAxisAngle(new THREE.Vector3(0,1,0),k*.16),spd,r*.8,col,false,info,.5)}
     else if(s.shape==='orb'){const m=new THREE.Mesh(sphereG,new THREE.MeshBasicMaterial({color:col}));m.scale.setScalar(.6);scene.add(m);orbs.push({m,a:0,l:5,info:{...info,dmg:Math.round(pw*.5)},hit:new Map()})}
     else if(s.shape==='trap'){const tx=P.x+Math.sin(P.face)*3,tz=P.z+Math.cos(P.face)*3,m=new THREE.Mesh(new THREE.CylinderGeometry(1,1,.2,12),new THREE.MeshBasicMaterial({color:col}));m.position.set(tx,H(tx,tz)+.15,tz);scene.add(m);traps.push({m,x:tx,z:tz,l:15,info})}
     else{const n=fx.includes('multi')?3:1;for(let k=0;k<n;k++)shoot(from,n>1?d.clone().applyAxisAngle(new THREE.Vector3(0,1,0),(k-1)*.14):d,spd,r,col,false,info)}}
-  if(s.recoil){hitPlayer(s.recoil,true)}if(s.exhaust)P.exh=3}
+  if(s.recoil){hitPlayer(s.recoil,true)}if(s.exhaust)P.exh=3;
+  if(fx.includes('echo')&&!castSlot.e)setTimeout(()=>{castSlot.e=1;CD[i]=0;const m=P.mp;P.mp=1e6;castSlot(i);P.mp=m;castSlot.e=0},300)}
 function applyHit(e,info){if(info.dot){e.dot=Math.round(info.dmg*.6);e.dotT=3;num(new THREE.Vector3(e.x,e.y+e.cy*2+1.5,e.z),'cursed','#a6e22e')}else{const d=info.dmg*(e.sealT>0?1.25:1);hurt(e,d);
     if(info.fx.includes('drain')){const h=Math.max(1,Math.round(d*.3));P.hp=Math.min(P.hpMax,P.hp+h)}}
-  if(info.fx.includes('freeze'))e.frz=2;else if(info.fx.includes('slow'))e.slw=4;
+  const fx=info.fx,L=fx.includes('linger')?2:1;
+  if(fx.includes('poison')||fx.includes('burn')){e.dot=Math.max(e.dot||0,Math.round(info.dmg*(info.dotMul||.25)));e.dotT=3*L}
+  if(!info.sub&&fx.includes('area')){for(const x of [...enemies])if(x!==e&&Math.hypot(x.x-e.x,x.z-e.z)<6)applyHit(x,{...info,dmg:Math.round(info.dmg*.7),sub:1});ring(e.x,e.z,6,'#ffb060')}
+  if(!info.sub&&fx.includes('chain')){let cur=e;const hs=new Set([e]);for(let k=0;k<2;k++){const nx=enemies.filter(x=>!hs.has(x)&&Math.hypot(x.x-cur.x,x.z-cur.z)<16).sort((a,b)=>Math.hypot(a.x-cur.x,a.z-cur.z)-Math.hypot(b.x-cur.x,b.z-cur.z))[0];if(!nx)break;hs.add(nx);
+    beamFx(new THREE.Vector3(cur.x,cur.y+cur.cy,cur.z),new THREE.Vector3(nx.x,nx.y+nx.cy,nx.z),'#9ad7ff');applyHit(nx,{...info,dmg:Math.round(info.dmg*.6),sub:1});cur=nx}}
+  if(fx.includes('freeze'))e.frz=2*L;else if(fx.includes('slow'))e.slw=4*L;
   const k=info.fx.includes('pull')?-14:info.fx.includes('push')?14:0;if(k){const dx=e.x-P.x,dz=e.z-P.z,dd=Math.hypot(dx,dz)||1;e.kx=dx/dd*k;e.kz=dz/dd*k}}
 function dash(){if(P.dashCd>0||P.mp<6||P.dead)return;P.mp-=6;P.dashT=.18;P.dashCd=.9;P.inv=Math.max(P.inv,.3)}
 
+// ---------- page fragments ----------
+const PT3=['bolt','area','beam','wave','orb','trap','summon','poison','burn','freeze','slow','drain','pierce','pull','push','chain','multi','big','fast','linger','echo'];
+const PTN={bolt:'Bolt',area:'Area',beam:'Beam',wave:'Wave',orb:'Orb',trap:'Trap',summon:'Summon',poison:'Poison',burn:'Burn',freeze:'Freeze',slow:'Slow',drain:'Life Steal',pierce:'Pierce',pull:'Pull',push:'Push',chain:'Chain',multi:'Multi-shot',big:'Big',fast:'Fast',linger:'Lingering',echo:'Echo'};
+const RAR3=['Common','Uncommon','Rare','Epic','Legendary'],RCOL3=['#e8e8e8','#5fd068','#3da5ff','#c070ff','#ffd700'],RPTS=[3,8,15,25,40];S.pageP=S.pageP||{};
+const frags3=[],fragGeo=new THREE.PlaneGeometry(.9,1.15);
+function rank3(id){const p=S.pageP[id]||0;let r=0;RPTS.forEach((v,i)=>{if(p>=v)r=i+1});return r}
+function roll3(b){const w=[50,28,14,6,2].map((v,k)=>v*(1+b*k*1.5)),tot=w.reduce((a,x)=>a+x,0);let v=Math.random()*tot,rar=0;for(;rar<4;rar++){if((v-=w[rar])<0)break}return{trait:PT3[Math.floor(Math.random()*PT3.length)],rar}}
+function spawnFrag3(){let x,z,tr=0;do{const a=Math.random()*6.283,d=25+Math.random()*95;x=P.x+Math.cos(a)*d;z=P.z+Math.sin(a)*d}while((Math.abs(x)>HALF-10||Math.abs(z)>HALF-10||zoneAt(x,z))&&tr++<12);
+  const f=roll3(Math.min(1,Math.hypot(x,z)/320)),m=new THREE.Mesh(fragGeo,new THREE.MeshStandardMaterial({color:'#f5ecd0',emissive:RCOL3[f.rar],emissiveIntensity:1.3,side:THREE.DoubleSide}));
+  m.position.set(x,H(x,z)+1.6,z);scene.add(m);frags3.push(Object.assign(f,{m,x,z}))}
+function fragTick(dt){while(frags3.length<14)spawnFrag3();const now=performance.now();for(const f of [...frags3]){f.m.rotation.y+=dt*2;f.m.position.y=H(f.x,f.z)+1.6+Math.sin(now/400+f.x)*.25;const d=Math.hypot(f.x-P.x,f.z-P.z);
+  if(d<2.4&&!P.dead){const b=rank3(f.trait);S.pageP[f.trait]=(S.pageP[f.trait]||0)+f.rar+1;const a=rank3(f.trait);burst(f.m.position,RCOL3[f.rar],20,6);num(f.m.position.clone().setY(f.m.position.y+1.6),RAR3[f.rar]+' '+PTN[f.trait],RCOL3[f.rar]);
+    if(a>b)banner(b?PTN[f.trait]+' page ranked up to '+RAR3[a-1]+'!':'New page bound: '+PTN[f.trait]+'!');persist();scene.remove(f.m);frags3.splice(frags3.indexOf(f),1)}
+  else if(d>170){scene.remove(f.m);frags3.splice(frags3.indexOf(f),1)}}}
 // ---------- settlements: Camp → Village → Town → City ----------
 const TITLES=['Camp','Village','Town','City'],RADII=[13,17,22,28];
 const COST=[null,{gold:30,mat:5},{gold:80,mat:12},{gold:200,mat:25,seal:2}];
@@ -325,7 +345,7 @@ const mini=$('mini').getContext('2d'),mapBg=document.createElement('canvas');map
 const mp=(x,z)=>[(x+HALF)/SIZE*160,(z+HALF)/SIZE*160];
 function drawMini(){mini.drawImage(mapBg,0,0);mini.fillStyle='rgba(0,0,0,.62)';for(const z of ZONES)if(z.rev===false){const bb=biome(z.x,z.z);for(let i=0;i<160;i+=8)for(let j=0;j<160;j+=8)if(biome(i/160*SIZE-HALF+4,j/160*SIZE-HALF+4)===bb)mini.fillRect(i,j,8,8)}
   mini.strokeStyle='#ffd27a';for(const s of ZONES){if(s.rev===false)continue;const[a,b]=mp(s.x,s.z);mini.beginPath();mini.arc(a,b,s.r/SIZE*160+1,0,7);mini.stroke()}
-  mini.fillStyle='#ff4a4a';for(const e of enemies){const[a,b]=mp(e.x,e.z);mini.fillRect(a-1,b-1,e.champ?4:2,e.champ?4:2)}
+  for(const f of frags3){const[a,b]=mp(f.x,f.z);mini.fillStyle=RCOL3[f.rar];mini.fillRect(a-1.5,b-1.5,3,3)}mini.fillStyle='#ff4a4a';for(const e of enemies){const[a,b]=mp(e.x,e.z);mini.fillRect(a-1,b-1,e.champ?4:2,e.champ?4:2)}
   const[a,b]=mp(P.x,P.z);mini.save();mini.translate(a,b);mini.rotate(-cam.yaw);mini.fillStyle='#fff';mini.beginPath();mini.moveTo(0,-5);mini.lineTo(3.5,4);mini.lineTo(-3.5,4);mini.fill();mini.restore()}
 
 // ---------- main loop ----------
@@ -361,7 +381,7 @@ function update(dt){const started=!$('start'),now=performance.now();let moving=f
     e.cd-=dt;if(!zone&&e.frz<=0&&d<e.r+1.1&&e.cd<=0&&Math.abs(P.y-gy2)<3){hitPlayer(e.dmg);e.cd=1;e.swingT=.35;if(e.R)oneShot(e.R,'1H_Melee_Attack_Chop',.5)}
     if(e.T.ranged&&e.frz<=0){e.shoot-=dt;if(e.shoot<=0&&d<45&&!zone){e.shoot=2.2;if(e.R)oneShot(e.R,'Spellcast_Shoot',.6);const from=new THREE.Vector3(e.x,e.y,e.z),dir=new THREE.Vector3(P.x-e.x,P.y+1.4-e.y,P.z-e.z).normalize();shoot(from,dir,20,.45,'#c080ff',true,{dmg:e.dmg})}}}
   for(const d of [...dying]){d.t-=dt;d.e.R.mixer.update(dt);if(d.t<=0){scene.remove(d.e.g);dying.splice(dying.indexOf(d),1)}}
-  towersTick(dt);
+  towersTick(dt);if(started)fragTick(dt);
   meleeT-=dt;if(meleeT<=0&&!P.dead&&started&&!zone){const e=enemies.find(e=>Math.hypot(e.x-P.x,e.z-P.z)<e.r+2.8&&!e.T.fly);if(e){meleeT=.45;P.face=Math.atan2(e.x-P.x,e.z-P.z);P.castT=.25;if(PM)oneShot(PM,'1H_Melee_Attack_Chop',.35);hurt(e,(6+S.lv*2)*(1+.03*rankIdx()));ring(P.x,P.z,3.2,ECOL)}}
   for(const f of [...familiars]){f.l-=dt;f.cd-=dt;const a=now/500+familiars.indexOf(f)*3;f.m.position.set(P.x+Math.cos(a)*1.6,P.y+3+Math.sin(now/300)*.3,P.z+Math.sin(a)*1.6);
     if(f.cd<=0&&!zone){const t=target(f.m.position);if(t&&Math.hypot(t.x-P.x,t.z-P.z)<40){f.cd=.7;shoot(f.m.position.clone(),new THREE.Vector3(t.x-f.m.position.x,t.y+t.cy-f.m.position.y,t.z-f.m.position.z).normalize(),36,.25,f.col,false,{dmg:f.dmg,fx:[],dot:false})}}if(f.l<=0)killFam(f)}
