@@ -13,6 +13,8 @@ A 2D pixel-art magic platformer that runs in the browser.
 **▶ [Play it live in your browser](https://newnyansan.github.io/grimoire-trials/)**
 
 Or download and open `index.html` locally.
+
+**New: [3D open-world prototype](https://newnyansan.github.io/grimoire-trials/3d.html)**: explore five regions with your mage, survive endless waves, and heal in safe zones (desktop, mouse + keyboard).
 No install needed. Progress saves in your browser.
 
-**Controls:** A/D move · W/Space jump · Q E R F skills · Left click/J basic attack · Shift dash · hold Right click/K to overcharge · Tab swap build · E use buildings in town · P/Esc pause · M mute
+**Controls:** A/D move · W/Space jump · Q, E, Left click, Right click = skills · melee is automatic when enemies are close · Shift dash · hold R/K to overcharge · Tab swap build · E use buildings in town · P/Esc pause · M mute

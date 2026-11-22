@@ -146,8 +146,8 @@ const T=16,W=320,H=180,keys={};let G=null;
 addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase();keys[k]=1;ac();if(k==='m'){muted=!muted;try{localStorage.setItem('mute',muted?'1':'0')}catch(x){}if(G)say('Sound '+(muted?'off':'on'))}if(!G)return;
   if([' ','arrowup','arrowdown'].includes(k))e.preventDefault();
   if(G.mode==='fight'){if(k==='tab'){e.preventDefault();swapBuild()}if(e.repeat)return;
-    const n=e.code.startsWith('Digit')?+e.code.slice(5):0,sk={q:1,e:2,r:3,f:4}[k]||(n>=1&&n<=4?n:0);if(sk)cast(sk-1,has('Overcharge')&&!!(keys.k||keys.rmb));
-    if(k==='escape'||k==='p'){busy()?app.innerHTML='':screenPause()}if(k==='j')melee();if(k==='z'&&has('Mana Armor')){G.armor=!G.armor;say('Mana Armor '+(G.armor?'ON':'off'))}
+    const n=e.code.startsWith('Digit')?+e.code.slice(5):0,sk={q:1,e:2}[k]||(n>=1&&n<=4?n:0);if(sk)cast(sk-1,has('Overcharge')&&!!(keys.r||keys.k));
+    if(k==='escape'||k==='p'){busy()?app.innerHTML='':screenPause()}if(k==='j'||k==='f')melee();if(k==='z'&&has('Mana Armor')){G.armor=!G.armor;say('Mana Armor '+(G.armor?'ON':'off'))}
     if(k==='g')field();if(k==='t')pactSuper();if(k==='shift'||k==='x'||k==='l')dash();if(k==='v'&&has('Flight')){G.fly=!G.fly;say('Flight '+(G.fly?'ON':'off'))}}
   else{if(k==='e'||k==='arrowdown')interact();if(k==='escape')app.innerHTML=''}});
 document.querySelectorAll('#touch [data-k]').forEach(b=>{const k=b.dataset.k;b.onpointerdown=()=>keys[k]=1;b.onpointerup=b.onpointerleave=()=>keys[k]=0});
@@ -205,7 +205,7 @@ function startFight(){
   G.sp.forEach(s=>s.cur=0);
   music('fight');app.innerHTML='';$('ttl').textContent=st?(st.rival?'Rival Duel: '+RIVAL:st.dungeon?'Forgotten Crypt (Dungeon)':st.awaken?'Awakening Trial':st.final?'The Hollow Citadel — Final Battle':`${bio.n} — Stage ${st.story.s+1}/4`):`Wave ${w} · ${bio.n}${boss?' — BOSS':''}`;
   hudButtons();
-  $('help').innerHTML=`Move <b>A/D</b> · Jump <b>W/Space</b> · Skills <b>Q E R F</b> (or 1–4) · Basic attack <b>left click / J</b> · Dash <b>Shift</b> · Overcharge: hold <b>right click / K</b> while casting · Enhance: hold <b>C</b> · Armor <b>Z</b> · Field <b>G</b> · Flight <b>V</b> · Aim: soft assist or mouse (switch in Pause) · Pact <b>T</b> · Swap build <b>Tab</b> (techniques as you unlock them) · P/Esc pause · M mutes sound<br>Enemy color = element: <b style="color:#ff6a3d">fire</b> beats <b style="color:#5fd068">nature</b> beats <b style="color:#ffe14d">storm</b> beats <b style="color:#3da5ff">water</b> beats fire; <b style="color:#fff3b0">light</b> and <b style="color:#a070ff">shadow</b> beat each other. Cast two different spells within 1s for a combo. · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · P/Esc pauses.
+  $('help').innerHTML=`Move <b>A/D</b> · Jump <b>W/Space</b> · Skills <b>Q · E · Left click · Right click</b> (or 1–4) · Melee is <b>automatic</b> when enemies are close · Dash <b>Shift</b> · Overcharge: hold <b>R / K</b> while casting · Enhance: hold <b>C</b> · Armor <b>Z</b> · Field <b>G</b> · Flight <b>V</b> · Aim: auto, soft or mouse (switch in Pause) · Pact <b>T</b> · Swap build <b>Tab</b> (techniques as you unlock them) · P/Esc pause · M mutes sound<br>Enemy color = element: <b style="color:#ff6a3d">fire</b> beats <b style="color:#5fd068">nature</b> beats <b style="color:#ffe14d">storm</b> beats <b style="color:#3da5ff">water</b> beats fire; <b style="color:#fff3b0">light</b> and <b style="color:#a070ff">shadow</b> beat each other. Cast two different spells within 1s for a combo. · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · P/Esc pauses.
   Letters above enemies = traits: ${Object.entries(TRAITS).map(([k,v])=>`<b>${k[0].toUpperCase()}</b> ${v}`).join(' · ')}`;
   say(bio.n+(bio.liq?' — beware the '+bio.liq+'!':bio.haz==='ice'?' — the ground is slippery!':bio.haz==='wind'?' — watch for wind gusts!':''));G.c=$('cv').getContext('2d');updHud();const g=G;requestAnimationFrame(t=>loop(t,g));
 }
@@ -227,7 +227,7 @@ function say(m,keep){if(G){if(keep)G.msgs.push(m);G.banner=m;G.bT=120}}
 function hurt(e,d,nw){if(e.dead)return;if(e.ward&&!nw)return pop(e,'warded','#ccc');if(e.type==='ghost'&&!e.vis&&!nw)return pop(e,'phased','#ccc');sfx('hit');burst(e.x+e.w/2,e.y+e.h/2,'#fff',5,1.5);G.shake=Math.max(G.shake,1.5);if(e.tr.includes('armored')&&!nw)d=Math.round(d*.7);if(e.sealT>0)d=Math.round(d*1.25);if(S.pact&&G.mode==='fight'&&!(G.frenzy>0))G.meter=Math.min(100,(G.meter||0)+(S.pact==='dark'?5:4));if(e.type)G.lastType=e.type;e.hp-=d;pop(e,'-'+d,'#fff');
   if(e.hp<=0){e.dead=1;G.kills++;if(e.type==='slime'&&!e.mini)for(const o of[-6,6]){const hp=Math.max(3,Math.round(e.hpMax*.35));G.en.push({...e,mini:1,dead:0,x:e.x+o,vy:-3,vx:o>0?.6:-.6,hp,hpMax:hp,dotT:0,frz:0,slw:0,t:0})}burst(e.x+e.w/2,e.y+e.h/2,e.col,e.boss?50:18,e.boss?3:2);G.shake=Math.max(G.shake,e.boss?9:3);sfx('kill');gainXP(Math.round((e.boss?30:4)*G.sc));dropMats(e);const ik=Object.keys(ITEMS),n=e.boss?2:Math.random()<.25?1:0;
     for(let i=0;i<n;i++){const it=ik[Math.floor(Math.random()*(e.boss?4:3))];S.inv[it]=(S.inv[it]||0)+1;sfx('pick');say('Found: '+it,1)}}}
-const TECH=[['Weapon Infusion',1,'Left click / J: free melee swing charged with your element'],['Overcharge',1,'Hold right click / K while casting: 2× power, 2× cost'],
+const TECH=[['Weapon Infusion',1,'Automatic melee swing charged with your element when enemies are close'],['Overcharge',1,'Hold R / K while casting: 2× power, 2× cost'],
   ['Meditation',1,'Stand still for 1s to regen mana 3× faster'],['Physical Enhancement',2,'Hold C: faster, higher jumps, 2× stomps — drains 10 mana/s'],
   ['Mana Armor',3,'Z toggles: hits drain mana before HP (2 mana/s upkeep)'],['Mana Sense',4,'See enemy traits and exact HP'],
   ['Mana Overflow',5,'Below 20% HP: spells cost HP instead of mana and hit 50% harder'],['Mana Field',7,'G: 6s aura — spells cost 30% less and home in (30 MP, 20s cooldown)'],
@@ -254,12 +254,12 @@ function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.
   if(s.kind==='copy')copyCast(s,pw);
   if(s.recoil){G.hp-=s.recoil;pop(p,'-'+s.recoil,'#d9534f')}
   if(s.exhaust)G.exh=180;updHud()}
-function melee(){if(!G||G.mode!=='fight'||G.mel>0||!has('Weapon Infusion'))return;const p=G.p;if(S.aim==='mouse'&&MOUSE.on)p.dir=Math.sign(MOUSE.x+G.cam-p.x-4)||p.dir;G.mel=24;G.swing=10;
+function melee(auto){if(!G||G.mode!=='fight'||G.mel>0||!has('Weapon Infusion'))return;const p=G.p;if(!auto&&S.aim==='mouse'&&MOUSE.on)p.dir=Math.sign(MOUSE.x+G.cam-p.x-4)||p.dir;G.mel=24;G.swing=10;
   const arc=tup('Arc Slash'),hb={x:p.dir>0?p.x+8:p.x-(arc?22:14),y:p.y-(arc?6:2),w:arc?22:14,h:arc?24:16};const nl=S.g.el==='Null';if(nl)G.mel=14;sfx('swing');G.en.forEach(e=>{if(!e.dead&&ov(hb,e)){if(e.type==='knight'&&!nl&&(G.p.x-e.x)*e.face>0)return pop(e,'blocked','#ccc');hurt(e,Math.round((6+S.lv*2)*(arc?1.5:1)*(G.frenzy>0?2:1)*(S.squad==='lions'&&G.hp>S.hpMax*.5?1.15:1)*(nl?3:affMul(S.g.el,e))),nl)}});
   if(nl)G.eproj=G.eproj.filter(q=>!ov({x:q.x,y:q.y,w:4,h:4},hb))}
 function field(){if(!has('Mana Field'))return;if(G.fieldCd>0)return say('Mana Field recharging…');if(G.mp<30)return say('Need 30 mana');
   G.mp-=30;G.field=tup('Grand Field')?600:360;G.fieldCd=1200;say('Mana Field!')}
-function techLine(){const t=[];if(S.pact)t.push((S.pact==='spirit'?'Spirit':'Dark')+' [T] '+Math.floor(G.meter||0)+'%'+(G.frenzy>0?' <b style="color:#c060ff">FRENZY</b>':''));if(has('Dash'))t.push(`Dash [Shift]${G.dashCd>0?' …':''}`);if(has('Flight'))t.push(`Flight [V] ${G.fly?'<b>ON</b>':'off'}`);if(G.hov)t.push('<b>Hovering</b>');if(has('Weapon Infusion'))t.push(`Melee [J/Click]${G.mel>0?' …':''}`);if(has('Physical Enhancement'))t.push(`Enhance [C]${G.enh?' <b>ON</b>':''}`);
+function techLine(){const t=[];if(S.pact)t.push((S.pact==='spirit'?'Spirit':'Dark')+' [T] '+Math.floor(G.meter||0)+'%'+(G.frenzy>0?' <b style="color:#c060ff">FRENZY</b>':''));if(has('Dash'))t.push(`Dash [Shift]${G.dashCd>0?' …':''}`);if(has('Flight'))t.push(`Flight [V] ${G.fly?'<b>ON</b>':'off'}`);if(G.hov)t.push('<b>Hovering</b>');if(has('Weapon Infusion'))t.push(`Auto-melee${G.mel>0?' …':''}`);if(has('Physical Enhancement'))t.push(`Enhance [C]${G.enh?' <b>ON</b>':''}`);
   if(has('Mana Armor'))t.push(`Armor [Z] ${G.armor?'<b style="color:var(--mana)">ON</b>':'off'}`);if(has('Mana Field'))t.push(`Field [G] ${G.field>0?'<b>ACTIVE</b>':G.fieldCd>0?Math.ceil(G.fieldCd/60)+'s':'ready'}`);
   if(G.still>60&&has('Meditation'))t.push('<b style="color:var(--mana)">Meditating</b>');if(overflow())t.push('<b style="color:var(--bad)">OVERFLOW: spells cost HP, +50% power</b>');
   return '<div class="mute">'+t.join(' · ')+'</div>'}
@@ -360,7 +360,7 @@ function draw(){
     else if(q.bomb){c.fillStyle='#222';c.fillRect(qx,q.y,5,5);c.fillStyle=G.t%6<3?'#ffd040':'#ff6020';c.fillRect(qx+2,q.y-2,1,2)}
     else{glow(c,qx+2,q.y+2,10,'rgba(255,90,40,.55)');c.fillStyle=q.c||'#ff5030';c.fillRect(qx,q.y,4,4);c.fillStyle='#ffd080';c.fillRect(qx+1,q.y+1,2,2)}}
   if(G.mode==='fight'&&S&&G.sp&&G.sp.length){if(S.aim==='mouse'){if(MOUSE.on){c.strokeStyle='rgba(255,255,255,.75)';c.strokeRect(Math.round(MOUSE.x)-3.5,Math.round(MOUSE.y)-3.5,7,7);c.fillStyle='#fff';c.fillRect(Math.round(MOUSE.x),Math.round(MOUSE.y),1,1)}}
-    else{const t=softTarget();if(t){const tx=Math.round(t.x+t.w/2-cam),ty=Math.round(t.y-10+Math.sin(G.t/8));c.fillStyle='rgba(255,233,160,.9)';c.fillRect(tx-2,ty,5,1);c.fillRect(tx-1,ty+1,3,1);c.fillRect(tx,ty+2,1,1)}}}
+    else{const t=softTarget(S.aim!=='soft');if(t){const tx=Math.round(t.x+t.w/2-cam),ty=Math.round(t.y-10+Math.sin(G.t/8));c.fillStyle='rgba(255,233,160,.9)';c.fillRect(tx-2,ty,5,1);c.fillRect(tx-1,ty+1,3,1);c.fillRect(tx,ty+2,1,1)}}}
   drawShapes(c,cam);
   if(S)glow(c,p.x-cam+4,p.y+6,18,rgba(elc(),.22));
   const ms=p.on&&Math.abs(p.vx)>0&&(G.t/6|0)%2?SPR.me2:SPR.me;
@@ -574,7 +574,7 @@ function ambient(){const b=G.bio,px=G.p.x,Rn=Math.random;
   if(b.amb==='ember'&&G.t%3===0)G.parts.push({x:px-170+Rn()*340,y:185,vx:(Rn()-.5)*.4,vy:-.6-Rn()*.6,l:200,c:Rn()<.5?'#ff7030':'#ffc040',s:Rn()<.3?2:1});
   if(b.amb==='snow'&&G.t%2===0)G.parts.push({x:px-180+Rn()*380,y:-4,vx:-.2+(Rn()-.5)*.3,vy:.45+Rn()*.3,l:400,c:'#ffffff',s:Rn()<.3?2:1});
   if(b.amb==='cloud'&&G.t%14===0)G.parts.push({x:px+180,y:20+Rn()*140,vx:-1-Rn(),vy:0,l:400,c:'#c8d4ff',s:2})}
-function hazards(){const p=G.p,b=G.bio;shapesTick();
+function hazards(){const p=G.p,b=G.bio;shapesTick();autoMelee();
   for(const q of G.pages)if(!q.got&&Math.abs(p.x+4-q.x)<10&&Math.abs(p.y+6-q.y)<14){q.got=1;sfx('pick');burst(q.x,q.y,'#fff3b0',14,1.5);say((q.chest?'Chest opened! ':'Page found! ')+'('+G.pages.filter(x=>x.got).length+'/3)');if(q.chest)chestLoot(q)}
   if(b.liq){const cx=Math.floor((p.x+4)/T),cy=Math.min(11,Math.floor((p.y+p.h)/T));
     if(G.grid[cx]&&G.grid[cx][cy]===2&&p.inv<=0){const L=b.liq==='lava';hitPlayer(Math.round(S.hpMax*(L?.12:.07)));p.vy=-7.5;p.inv=50;burst(p.x+4,p.y+12,L?'#ff8030':'#7dff7a',14,2);pop(p,L?'burned!':'poisoned!','#ffb020')}}
@@ -607,6 +607,7 @@ function screenPortal(){const st=story();
   `<p class="mute">${REG[Math.min(st.r,5)].lore}</p><p>Stage ${st.r>=5?'FINAL':(st.s+1)+'/4'}: <b>${stageName(st)}</b>. Objective: ${OBJ_TXT[stageObj(st)]}.</p>
   <p>Seal Shards: <span style="color:#ffd700">${'◆'.repeat(st.shards)}</span>${'◇'.repeat(5-st.shards)}</p><button onclick="startStory()">Enter stage</button>`}</div>
   <div class="card"><h2>Endless Trials</h2><p class="mute">Wave ${S.wave} (best ${S.best}). Biomes rotate every 5 waves.</p><button onclick="startFight()">Enter wave ${S.wave}</button></div>
+  <div class="card"><h2>3D Open World <span class="tag">prototype</span></h2><p class="mute">Take your mage into a big 3D world: five regions, endless waves that grow stronger, and safe zones where you heal. Desktop with mouse and keyboard.</p><button onclick="save();location.href='3d.html'">Open the 3D world</button></div>
   <div class="card"><h2>Dungeon</h2><p class="mute">The Forgotten Crypt: open 3 treasure chests full of materials, then escape. Scales to your level.</p><button onclick="startDungeon()">Enter the crypt</button></div>
   <div class="card"><h2>Rival</h2><p class="mute">${rivalLine()}</p>${rivalReady()&&(S.rivalWins||0)<5?'<button onclick="startRival()">Duel '+RIVAL+'</button>':''}</div>
   <button onclick="app.innerHTML=''">Close</button>`}
@@ -646,7 +647,7 @@ function buyTech(n){const t=TECH_UP.find(x=>x.n===n);if(S.tup[n]||!has(t.req)||!
 
 // ---------- QOL / SHAPES / PACTS ----------
 function screenPause(){if(!G||G.mode!=='fight')return;app.innerHTML=`<h1>Paused</h1><div class="card"><button onclick="app.innerHTML=''">Resume</button><button onclick="app.innerHTML='';leave()">Retreat to town</button>
-  <button onclick="muted=!muted;try{localStorage.setItem('mute',muted?'1':'0')}catch(e){};screenPause()">Sound: ${muted?'off':'on'}</button><button onclick="S.aim=S.aim==='mouse'?'soft':'mouse';save();screenPause()">Aim: ${S.aim==='mouse'?'Mouse':'Soft assist'}</button></div><p class="mute">${$('help').innerHTML}</p>`}
+  <button onclick="muted=!muted;try{localStorage.setItem('mute',muted?'1':'0')}catch(e){};screenPause()">Sound: ${muted?'off':'on'}</button><button onclick="S.aim=({auto:'soft',soft:'mouse',mouse:'auto'})[S.aim||'auto'];save();screenPause()">Aim: ${S.aim==='mouse'?'Mouse':S.aim==='soft'?'Soft assist':'Auto'}</button></div><p class="mute">${$('help').innerHTML}</p>`}
 function screenBackup(){let code='';try{code=btoa(unescape(encodeURIComponent(JSON.stringify(S))))}catch(e){}
   app.innerHTML=`<h1>Save Backup</h1><div class="card"><p class="mute">Copy this code somewhere safe. To restore, paste a code into the box and press Import. That replaces your current save.</p>
   <textarea id="bk" rows="5" style="width:100%;background:#0e0c14;color:var(--ink);border:1px solid #453d5e;border-radius:6px;padding:6px;font:12px monospace;word-break:break-all">${code}</textarea>
@@ -686,23 +687,23 @@ function finishAwaken(won){const g=G;if(won){sfx('win');S.awake=1;S.g.name='Awak
   save();const m=g.msgs;startTown();G.p.x=4*T;app.innerHTML=`<h1>${won?'Awakened!':'Defeated'}</h1><div class="card">${tidy(m).map(x=>`<div>${x}</div>`).join('')}<button onclick="app.innerHTML=''">Back to town</button></div>`}
 
 // ---------- CONTROLS & BUILDS ----------
-{const cv=$('cv');cv.addEventListener('mousedown',e=>{ac();if(!G||G.mode!=='fight'||busy())return;if(e.button===0)melee();if(e.button===2)keys.rmb=1});
+{const cv=$('cv');cv.addEventListener('mousedown',e=>{ac();if(!G||G.mode!=='fight'||busy())return;const oc=has('Overcharge')&&!!(keys.r||keys.k);if(e.button===0)cast(2,oc);if(e.button===2)cast(3,oc)});
  cv.addEventListener('contextmenu',e=>e.preventDefault());addEventListener('mouseup',e=>{if(e.button===2)keys.rmb=0})}
 function fixLoad(){if(!S.builds){const l=(S.load||[]).slice(0,4);S.builds=[{load:l,pas:''},{load:l.slice(),pas:''}];S.bi=0}
   S.bi=S.bi?1:0;S.builds.forEach(b=>{b.load=b.load.filter(i=>i<S.g.spells.length).slice(0,4);if(!b.load.length)b.load=S.g.spells.map((_,i)=>i).slice(0,4)});S.load=S.builds[S.bi].load}
 const PASSIVES=[['','None'],['Arcane Focus','+15% spell power'],['Mana Flow','+40% mana regen'],['Iron Skin','take 20% less damage'],['Swiftness','+20% speed, dash recharges 2× faster'],
   ['Elemental Mastery','weakness hits deal 1.8× instead of 1.5×'],['Mana Armor','Mana Armor starts switched on']];
 function screenLoadout(){fixLoad();const b=S.builds[S.bi],tag={grant:'granted',forge:'forged'},K=['Q','E','R','F'];
-  app.innerHTML=`<h1>Builds</h1><div class="card"><p class="mute">Equip up to 4 skills on Q E R F and 1 passive. Keep two builds and swap between them in battle with Tab.</p>
+  app.innerHTML=`<h1>Builds</h1><div class="card"><p class="mute">Equip up to 4 skills (Q, E, left click, right click) and 1 passive. Keep two builds and swap between them in battle with Tab.</p>
   ${[0,1].map(j=>`<button onclick="S.bi=${j};fixLoad();save();screenLoadout()" ${j===S.bi?'style="border-color:var(--acc)"':''}>Build ${j+1}${j===S.bi?' (editing)':''}</button>`).join('')}
-  <p>Aiming: <button onclick="S.aim=S.aim==='mouse'?'soft':'mouse';save();screenLoadout()">${S.aim==='mouse'?'Mouse aim: spells fly toward your cursor':'Soft aim-assist: spells angle toward the enemy you face'}</button></p>
+  <p>Aiming: <button onclick="S.aim=({auto:'soft',soft:'mouse',mouse:'auto'})[S.aim||'auto'];save();screenLoadout()">${S.aim==='mouse'?'Mouse aim: spells fly toward your cursor':S.aim==='soft'?'Soft assist: spells angle toward the enemy you face':'Auto aim: spells lock onto the nearest enemy in any direction'}</button></p>
   <p>Passive: <select onchange="S.builds[S.bi].pas=this.value;save()">${PASSIVES.filter(p=>p[0]!=='Mana Armor'||has('Mana Armor')).map(p=>`<option value="${p[0]}" ${b.pas===p[0]?'selected':''}>${p[0]||'None'}${p[0]?': '+p[1]:''}</option>`).join('')}</select></p>
   ${S.g.spells.map((s,i)=>{const k=b.load.indexOf(i);return `<div><button onclick="toggleLoad(${i})">${k>=0?'['+K[k]+'] ✔':'+ equip'}</button> <b>${esc(s.name)}</b> <span class="tag">${tag[s.src]||(i<4?'starter':'forged')}</span> <span class="mute">${desc(s)}</span></div>`}).join('')}
   <button onclick="screenHub()">Done</button></div>`}
 function toggleLoad(i){const l=S.builds[S.bi].load,k=l.indexOf(i);if(k>=0){if(l.length>1)l.splice(k,1)}else if(l.length<4)l.push(i);fixLoad();save();screenLoadout()}
 function swapBuild(){if(!G||G.mode!=='fight'||(G.swapCd||0)>G.t)return;G.swapCd=G.t+60;S.bi=1-S.bi;fixLoad();G.sp=S.load.map(i=>S.g.spells[i]);G.sp.forEach(s=>s.cur=Math.max(s.cur||0,30));
   G.pas=S.builds[S.bi].pas||'';if(G.pas==='Mana Armor'&&has('Mana Armor'))G.armor=true;hudButtons();say('Build '+(S.bi+1)+(G.pas?' · '+G.pas:''));sfx('pick')}
-function hudButtons(){const K=['Q','E','R','F'];$('hud').innerHTML=`<div id="hs"></div><div class="mute">Build ${S.bi+1}${G.pas?' · passive: <b>'+G.pas+'</b>':''} · Tab swaps builds</div>${G.sp.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${K[i]}] ${esc(s.name)}<br><span class="mute">${desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;updHud()}
+function hudButtons(){const K=['Q','E','L-Click','R-Click'];$('hud').innerHTML=`<div id="hs"></div><div class="mute">Build ${S.bi+1}${G.pas?' · passive: <b>'+G.pas+'</b>':''} · Tab swaps builds</div>${G.sp.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${K[i]}] ${esc(s.name)}<br><span class="mute">${desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;updHud()}
 
 // ---------- SPECIAL POWERS ----------
 Object.assign(NOUN,{summon:['Familiar','Sprite','Wisp'],seal:['Seal','Lock','Binding'],copy:['Mirror','Echo','Mimicry']});
@@ -761,16 +762,20 @@ function finishSpecial(won,kind){const g=G,m=g.msgs;
 // ---------- AIMING ----------
 const MOUSE={x:0,y:0,on:false};
 {const cv=$('cv');cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();MOUSE.x=(e.clientX-r.left)/r.width*W;MOUSE.y=(e.clientY-r.top)/r.height*H;MOUSE.on=true});cv.addEventListener('mouseleave',()=>MOUSE.on=false)}
-function softTarget(){const p=G.p,x0=p.x+4,y0=p.y+6;let best=null,bd=1e9;
-  for(const e of G.en){if(e.dead||(e.type==='ghost'&&!e.vis))continue;const dx=e.x+e.w/2-x0,dy=e.y+e.h/2-y0;if(dx*p.dir<-4)continue;const d=Math.hypot(dx,dy);
-    if(d>200||Math.abs(Math.atan2(dy,Math.abs(dx)))>.61)continue;if(d<bd){bd=d;best=e}}return best}
+function softTarget(all){const p=G.p,x0=p.x+4,y0=p.y+6;let best=null,bd=1e9;
+  for(const e of G.en){if(e.dead||(e.type==='ghost'&&!e.vis))continue;const dx=e.x+e.w/2-x0,dy=e.y+e.h/2-y0;if(!all&&dx*p.dir<-4)continue;const d=Math.hypot(dx,dy);
+    if(d>(all?230:200)||(!all&&Math.abs(Math.atan2(dy,Math.abs(dx)))>.61))continue;if(d<bd){bd=d;best=e}}return best}
 function aimVec(){const p=G.p,x0=p.x+4,y0=p.y+6;
   if(S.aim==='mouse'&&MOUSE.on){const dx=MOUSE.x+(G.cam||0)-x0,dy=MOUSE.y-y0,d=Math.hypot(dx,dy)||1;if(Math.abs(dx)>2)p.dir=Math.sign(dx);return{x:dx/d,y:dy/d}}
-  const t=softTarget();if(t){const dx=t.x+t.w/2-x0,dy=t.y+t.h/2-y0,d=Math.hypot(dx,dy)||1;return{x:dx/d,y:dy/d}}return{x:p.dir,y:0}}
+  const t=softTarget(S.aim!=='soft');if(t){const dx=t.x+t.w/2-x0,dy=t.y+t.h/2-y0,d=Math.hypot(dx,dy)||1;if(S.aim!=='soft'&&Math.abs(dx)>2)p.dir=Math.sign(dx);return{x:dx/d,y:dy/d}}return{x:p.dir,y:0}}
 
 // ---------- RESULTS SUMMARY ----------
 function fightStats(){const k=G.kills||0,cb=G.combos||0;G.msgs.push('Enemies defeated: '+k+(cb?' · Combos: '+cb:''))}
 function tidy(m){const out=[],cnt={};for(const x of m){if(cnt[x])cnt[x]++;else{cnt[x]=1;out.push(x)}}return out.map(x=>cnt[x]>1?x+' ×'+cnt[x]:x)}
+
+function autoMelee(){if(!has('Weapon Infusion')||G.mel>0||busy()||G.frenzy>0)return;const p=G.p,cx=p.x+4;
+  const e=G.en.find(e=>!e.dead&&!(e.type==='ghost'&&!e.vis)&&Math.abs(e.x+e.w/2-cx)<20&&e.y<p.y+p.h+4&&e.y+e.h>p.y-6);if(!e)return;
+  p.dir=Math.sign(e.x+e.w/2-cx)||p.dir;melee(true)}
 if(S)S.inv=S.inv||{};
 startTown();
 </script></body></html>
