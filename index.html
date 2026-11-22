@@ -136,7 +136,7 @@ function forge(){
   if(!/^[A-Za-z ]{3,24}$/.test(n))return $('ferr').textContent='Name must be 3–24 letters.';
   if(BANNED.test(n))return $('ferr').textContent='Please choose a family-friendly name.';
   const kreq={summon:8,seal:6,copy:10}[$('fk').value];if(kreq&&S.lv<kreq)return $('ferr').textContent='That magic unlocks at level '+kreq+'.';if(!S.forgePts)return $('ferr').textContent='You need a Forge point (earned every 3 levels).';if(S.g.spells.length>=16)return $('ferr').textContent='Your grimoire is full (16 spells).';
-  const s=forgeSpell(),c=$('fc').value;s.name=n;if(c)S.inv[c]--;S.g.spells.push(s);S.forgePts--;fixLoad();if(S.load.length<4)S.load.push(S.g.spells.length-1);save();screenHub();
+  const s=forgeSpell(),c=$('fc').value;s.name=n;if(c)S.inv[c]--;S.g.spells.push(s);S.forgePts--;fixLoad();autoEquip(S.g.spells.length-1);save();screenHub();
 }
 
 // ---------- COMBAT (2D pixel platformer) ----------
@@ -202,7 +202,7 @@ function startFight(){
   const ros=w<=2?['slime','bat']:bio.roster;en.forEach(e=>{if(!e.boss){e.type=ros[Math.floor(r()*ros.length)];e.h=HOF[e.type];e.hp=Math.round(e.hp*(HPM[e.type]||1));e.atk=Math.round(e.atk*(ATKM[e.type]||1));
     if(e.type==='bat'||e.type==='ghost'){e.y=30+r()*50;e.by=e.y}e.name=TNAME[e.type]}e.hpMax=e.hp});
   const fc=cols-3;
-  G={mode:'fight',rival:!!(st&&st.rival),dungeon:!!(st&&st.dungeon),meter:0,frenzy:0,fams:[],orbs:[],traps:[],walls:[],beams:[],awaken:!!(st&&st.awaken),bio,story:st&&st.story,obj:st?st.obj:null,final:!!(st&&st.final),kills:0,killGoal:0,pages:[],fires:[],windDir:1,pvx:0,parts:[],shake:0,air:0,jPrev:0,dashT:0,dashCd:0,fly:false,hov:0,eproj:[],bossSeen:0,sp:(fixLoad(),S.load.map(i=>S.g.spells[i])),pas:S.builds[S.bi].pas||'',field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
+  G={mode:'fight',rival:!!(st&&st.rival),dungeon:!!(st&&st.dungeon),meter:0,frenzy:0,fams:[],orbs:[],traps:[],walls:[],beams:[],awaken:!!(st&&st.awaken),bio,story:st&&st.story,obj:st?st.obj:null,final:!!(st&&st.final),kills:0,killGoal:0,pages:[],fires:[],windDir:1,pvx:0,parts:[],shake:0,air:0,jPrev:0,dashT:0,dashCd:0,fly:false,hov:0,eproj:[],bossSeen:0,sp:(fixLoad(),spOf()),pas:S.builds[S.bi].pas||'',field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
      msgs:[],banner:'',bT:0,flagX:fc*T,flagY:grid[fc].indexOf(1)*T,lastSafe:24,t:0,acc:0,last:performance.now(),running:1};
   if(G.pas==='Mana Armor'&&has('Mana Armor'))G.armor=true;
   if(S.pact==='spirit')G.fams.push({spirit:1,x:G.p.x,y:G.p.y-14,l:1e9,dmg:Math.round(8+S.lv*1.5),el:S.g.el,cd:30});
@@ -246,7 +246,7 @@ TECH.sort((a,b)=>a[1]-b[1]);
 const has=n=>!!S&&S.lv>=TECH.find(t=>t[0]===n)[1];
 const overflow=()=>has('Mana Overflow')&&G.hp<S.hpMax*.2;
 const costOf=(s,o)=>Math.round(s.cost*(o?2:1)*(G.field>0?.7:1));
-function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.sp[i],p=G.p;if(!s||s.cur>0||G.gcd>0)return;
+function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.sp[i],p=G.p;if(!s||s.empty||s.cur>0||G.gcd>0)return;
   const c=costOf(s,o),ovf=overflow();let pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1)*(G.pas==='Arcane Focus'?1.15:1)*(S.pact==='spirit'?1.1:S.pact==='dark'?1.3:1)*(S.squad==='lions'&&G.hp>S.hpMax*.5?1.15:1)*(1+.03*rankIdx()));
   if(ovf){if(G.hp<=Math.ceil(c/2)+1)return;G.hp-=Math.ceil(c/2)}else{if(G.mp<c)return;G.mp-=c}
   s.cur=Math.round((s.cd+.6)*60);G.gcd=15;burst(p.x+(p.dir>0?9:-1),p.y+6,elc(),6,1.2);sfx('cast');if(o)say('OVERCHARGE: '+s.name+'!');
@@ -378,7 +378,7 @@ function draw(){
   const ms=p.on&&Math.abs(p.vx)>0&&(G.t/6|0)%2?SPR.me2:SPR.me;
   if(S&&S.squad&&!(p.inv>0&&G.t%6<3)){c.fillStyle=SQ[S.squad].col;const cx0=p.dir>0?p.x-cam-1:p.x-cam+6,wv=Math.abs(p.vx)>0?(G.t>>2)%2:0;c.fillRect(cx0,p.y+6,3,5+wv);c.fillRect(p.dir>0?cx0-1:cx0+3,p.y+9+wv,1,3)}
   if(!(p.inv>0&&G.t%6<3)){outline(c,ms,p.x-cam,p.y,1,p.dir<0);spr(c,ms,p.x-cam,p.y,{h:'#3a2f55',s:'#f1c27d',e:'#000',k:'#222',b:'#c9a54a'},S?elc():'#888',1,p.dir<0)}
-  if(G.sh>0){c.strokeStyle='#4a8fd9';c.strokeRect(p.x-cam-2.5,p.y-2.5,13,17)}
+  if(G.sh>0){glow(c,p.x-cam+4,p.y+6,15,'rgba(90,170,255,.35)');c.strokeStyle='rgba(150,210,255,.85)';c.beginPath();c.arc(p.x-cam+4,p.y+6,10+Math.sin(G.t/8),0,6.283);c.stroke()}
   const px=p.x-cam;
   if(G.mode==='fight'){
     if(G.dashT>0){c.globalAlpha=.3;spr(c,SPR.me,px-p.dir*8,p.y,{},elc(),1,p.dir<0);c.globalAlpha=1}
@@ -415,7 +415,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 function grantSpell(){if(S.g.spells.length>=16||S.g.el==='Null')return;const kinds=S.lv>=10?['dmg','summon','dot','seal','shield','copy','heal']:['dmg','dot','shield','dmg','heal'],r=rng(S.g.seed+S.lv*31);
   const gel=S.g.el2&&S.lv%4===0?S.g.el2:S.g.el,s=genSpell(r,gel,kinds[(S.lv/2|0)%kinds.length],S.g.mult*(1+S.lv*.08),1);s.cd=Math.max(1,s.cd);s.src='grant';s.el=gel;
   s.fx=s.kind==='dmg'&&r()<.6?[pick(r,['pierce','slow','multi','drain','fast','big'])]:[];
-  S.g.spells.push(s);fixLoad();if(S.load.length<4)S.load.push(S.g.spells.length-1);say('Your grimoire reveals: '+s.name+'!',1)}
+  S.g.spells.push(s);fixLoad();autoEquip(S.g.spells.length-1);say('Your grimoire reveals: '+s.name+'!',1)}
 function fixLoad(){S.load=(S.load||[]).filter(i=>i<S.g.spells.length);if(!S.load.length)S.load=S.g.spells.map((_,i)=>i).slice(0,5)}
 function screenLoadout(){fixLoad();const tag={grant:'granted',forge:'forged'};
   app.innerHTML=`<h1>Loadout</h1><div class="card"><p class="mute">Pick up to 5 spells to bring into battle. Keys 1–5 follow this order.</p>${S.g.spells.map((s,i)=>{const k=S.load.indexOf(i);
@@ -458,7 +458,7 @@ function sageAsk(){const q=$('sq').value.trim();if(!q)return;const r=sageParse(q
 function sageForge(){const n=$('sn').value.trim().replace(/\s+/g,' '),er=m=>$('serr').textContent=m;
   if(!/^[A-Za-z ]{3,24}$/.test(n))return er('Name must be 3–24 letters.');if(BANNED.test(n))return er('Please choose a family-friendly name.');
   if(!S.forgePts)return er('You need a Forge point (earned every 3 levels).');if(S.g.spells.length>=16)return er('Your grimoire is full (16 spells).');
-  const s=sagePending;s.name=n;S.g.spells.push(s);S.forgePts--;fixLoad();if(S.load.length<4)S.load.push(S.g.spells.length-1);save();
+  const s=sagePending;s.name=n;S.g.spells.push(s);S.forgePts--;fixLoad();autoEquip(S.g.spells.length-1);save();
   sageLog.push('🧙 <b>Sage:</b> "'+esc(n)+'" is now written in your grimoire!');sagePending=null;screenSage()}
 function applyHit(q,e){const f=q.fx,dir=G.p.x<e.x?1:-1;
   if(q.boom){G.en.filter(x=>x!==e&&!x.dead&&Math.abs(x.x-e.x)<32&&Math.abs(x.y-e.y)<32).forEach(x=>hurt(x,Math.round(q.dmg*.6)));burst(e.x+4,e.y+4,'#ff9030',18,2);G.shake=Math.max(G.shake,3)}
@@ -714,14 +714,14 @@ const PASSIVES=[['','None'],['Arcane Focus','+15% spell power'],['Mana Flow','+4
 function screenLoadout(){fixLoad();const b=S.builds[S.bi],tag={grant:'granted',forge:'forged'},K=['Q','E','R','F'];
   app.innerHTML=`<h1>Builds</h1><div class="card"><p class="mute">Equip up to 4 skills (Q, E, left click, right click) and 1 passive. Keep two builds and swap between them in battle with Tab.</p>
   ${[0,1].map(j=>`<button onclick="S.bi=${j};fixLoad();save();screenLoadout()" ${j===S.bi?'style="border-color:var(--acc)"':''}>Build ${j+1}${j===S.bi?' (editing)':''}</button>`).join('')}
-  <p>Aiming: <button onclick="S.aim=({auto:'soft',soft:'mouse',mouse:'auto'})[S.aim||'auto'];save();screenLoadout()">${S.aim==='mouse'?'Mouse aim: spells fly toward your cursor':S.aim==='soft'?'Soft assist: spells angle toward the enemy you face':'Auto aim: spells lock onto the nearest enemy in any direction'}</button></p>
+  ${loadPicker()}<p>Aiming: <button onclick="S.aim=({auto:'soft',soft:'mouse',mouse:'auto'})[S.aim||'auto'];save();screenLoadout()">${S.aim==='mouse'?'Mouse aim: spells fly toward your cursor':S.aim==='soft'?'Soft assist: spells angle toward the enemy you face':'Auto aim: spells lock onto the nearest enemy in any direction'}</button></p>
   <p>Passive: <select onchange="S.builds[S.bi].pas=this.value;save()">${PASSIVES.filter(p=>p[0]!=='Mana Armor'||has('Mana Armor')).map(p=>`<option value="${p[0]}" ${b.pas===p[0]?'selected':''}>${p[0]||'None'}${p[0]?': '+p[1]:''}</option>`).join('')}</select></p>
-  ${S.g.spells.map((s,i)=>{const k=b.load.indexOf(i);return `<div><button onclick="toggleLoad(${i})">${k>=0?'['+K[k]+'] ✔':'+ equip'}</button> <b>${esc(s.name)}</b> <span class="tag">${tag[s.src]||(i<4?'starter':'forged')}</span> <span class="mute">${desc(s)}</span></div>`}).join('')}
+  ${S.g.spells.map((s,i)=>{const k=b.load.indexOf(i);return `<div><button onclick="toggleLoad(${i})">${k>=0?'['+K[k]+'] ✔ unequip':(LD.pick===i?'choose a key ↑':'+ equip')}</button> <b>${esc(s.name)}</b> <span class="tag">${tag[s.src]||(i<4?'starter':'forged')}</span> <span class="mute">${desc(s)}</span></div>`}).join('')}
   <button onclick="screenHub()">Done</button></div>`}
-function toggleLoad(i){const l=S.builds[S.bi].load,k=l.indexOf(i);if(k>=0){if(l.length>1)l.splice(k,1)}else if(l.length<4)l.push(i);fixLoad();save();screenLoadout()}
-function swapBuild(){if(!G||G.mode!=='fight'||(G.swapCd||0)>G.t)return;G.swapCd=G.t+60;S.bi=1-S.bi;fixLoad();G.sp=S.load.map(i=>S.g.spells[i]);G.sp.forEach(s=>s.cur=Math.max(s.cur||0,30));
+function toggleLoad(i){const l=S.builds[S.bi].load,k=l.indexOf(i);if(k>=0){l[k]=null;LD.pick=null}else LD.pick=i;fixLoad();save();screenLoadout()}
+function swapBuild(){if(!G||G.mode!=='fight'||(G.swapCd||0)>G.t)return;G.swapCd=G.t+60;S.bi=1-S.bi;fixLoad();G.sp=spOf();G.sp.forEach(s=>s.cur=Math.max(s.cur||0,30));
   G.pas=S.builds[S.bi].pas||'';if(G.pas==='Mana Armor'&&has('Mana Armor'))G.armor=true;hudButtons();say('Build '+(S.bi+1)+(G.pas?' · '+G.pas:''));sfx('pick')}
-function hudButtons(){const K=['Q','E','L-Click','R-Click'];$('hud').innerHTML=`<div id="hs"></div><div class="mute">Build ${S.bi+1}${G.pas?' · passive: <b>'+G.pas+'</b>':''} · Tab swaps builds</div>${G.sp.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${K[i]}] ${esc(s.name)}<br><span class="mute">${desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;updHud()}
+function hudButtons(){const K=['Q','E','L-Click','R-Click'];$('hud').innerHTML=`<div id="hs"></div><div class="mute">Build ${S.bi+1}${G.pas?' · passive: <b>'+G.pas+'</b>':''} · Tab swaps builds</div>${G.sp.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${K[i]}] ${s.empty?'—':esc(s.name)}<br><span class="mute">${s.empty?'empty slot':desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;updHud()}
 
 // ---------- SPECIAL POWERS ----------
 Object.assign(NOUN,{summon:['Familiar','Sprite','Wisp'],seal:['Seal','Lock','Binding'],copy:['Mirror','Echo','Mimicry']});
@@ -825,7 +825,7 @@ function craftPreview(sel){const ids=[sel.form,...sel.mods],sum=ids.reduce((a,id
 function pbToggle(id){const m=PB.sel.mods,k=m.indexOf(id);if(k>=0)m.splice(k,1);else if(m.length<pbMax())m.push(id);screenPages()}
 function pbMax(){return 2+Math.floor(S.lv/5)}
 function pbCraft(){const n=$('pbn').value.trim().replace(/\s+/g,' '),er=m=>$('pberr').textContent=m;if(!/^[A-Za-z ]{3,24}$/.test(n))return er('Name must be 3–24 letters.');if(BANNED.test(n))return er('Please choose a family-friendly name.');
-  if(S.g.spells.length>=16)return er('Your grimoire is full (16 spells).');const s=craftPreview(PB.sel);s.name=n;s.el=S.g.el;S.g.spells.push(s);fixLoad();if(S.load.length<4)S.load.push(S.g.spells.length-1);save();sfx('level');
+  if(S.g.spells.length>=16)return er('Your grimoire is full (16 spells).');const s=craftPreview(PB.sel);s.name=n;s.el=S.g.el;S.g.spells.push(s);fixLoad();autoEquip(S.g.spells.length-1);save();sfx('level');
   PB.sel={form:'bolt',mods:[]};screenPages();$('pberr').style.color='var(--good)';$('pberr').textContent='"'+n+'" is bound into your grimoire! Equip it in Builds.'}
 function screenPages(){S.pageP=S.pageP||{};const sel=PB.sel;if(!pageRank(sel.form))sel.form='bolt';sel.mods=sel.mods.filter(m=>pageRank(m));
   const rows=['Form','Effect','Modifier'].map(ty=>'<p style="margin:8px 0 2px"><b>'+ty+'s</b></p>'+PTRAITS.filter(t=>t.type===ty).map(t=>{const pts=S.pageP[t.id]||0,rk=pageRank(t.id),nx=RANK_PTS[rk];
@@ -835,6 +835,16 @@ function screenPages(){S.pageP=S.pageP||{};const sel=PB.sel;if(!pageRank(sel.for
    '<div class="card"><b>Craft a spell</b><p>Form: '+forms.map(t=>'<button onclick="PB.sel.form=\''+t.id+'\';screenPages()" '+(sel.form===t.id?hl:'')+'>'+t.n+'</button>').join(' ')+'</p>'+
    '<p>Traits (up to '+pbMax()+' at level '+S.lv+', +1 every 5 levels; each one adds mana cost): '+(mods.map(t=>'<button onclick="pbToggle(\''+t.id+'\')" '+(sel.mods.includes(t.id)?hl:'')+'>'+(sel.mods.includes(t.id)?'✔ ':'')+t.n+'</button>').join(' ')||'<span class="mute">none yet. Collect fragments!</span>')+'</p>'+
    '<p>Result: <b>'+desc(pv)+'</b></p><p>Name: <input id="pbn" maxlength="24"> <button onclick="pbCraft()">Bind spell</button></p><p id="pberr" style="color:var(--bad)"></p></div><button onclick="screenHub()">Back</button>'}
+
+// ---------- KEY ASSIGNMENT ----------
+const LD={pick:null};
+const EMPTY=()=>({name:'empty',kind:'none',power:0,cost:0,cd:0,cur:0,empty:true,fx:[]});
+function spOf(){return S.load.map(i=>i==null||!S.g.spells[i]?EMPTY():S.g.spells[i])}
+function autoEquip(x){const k=S.load.indexOf(null);if(k>=0)S.load[k]=x;else if(S.load.length<4)S.load.push(x)}
+function loadPicker(){if(LD.pick==null||!S.g.spells[LD.pick])return '';const l=S.builds[S.bi].load,K=['Q','E','Left click','Right click'];
+  return '<div class="card" style="border-color:#ffd27a"><b>Assign "'+esc(S.g.spells[LD.pick].name)+'" to which key?</b><p>'+K.map((k,s)=>{const cur=l[s]!=null&&S.g.spells[l[s]]?S.g.spells[l[s]].name:'empty';
+    return '<button onclick="assignSlot('+s+')">['+k+'] '+esc(cur)+'</button>'}).join(' ')+' <button onclick="LD.pick=null;screenLoadout()">Cancel</button></p><p class="mute">The spell already on that key is unequipped.</p></div>'}
+function assignSlot(s){const l=S.builds[S.bi].load;while(l.length<=s)l.push(null);const ex=l.indexOf(LD.pick);if(ex>=0)l[ex]=null;l[s]=LD.pick;LD.pick=null;fixLoad();save();sfx('pick');screenLoadout()}
 if(S)S.inv=S.inv||{};
 startTown();embedMenu();
 </script></body></html>

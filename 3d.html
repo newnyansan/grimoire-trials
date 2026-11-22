@@ -50,10 +50,10 @@ const EL=S.g.el,ECOL=EL_COL[EL]||'#c9a54a';
 const xpNeed=()=>Math.round(40*Math.pow(1.35,S.lv-1));
 const RANKS=[0,10,25,50,90,150];const rankIdx=()=>RANKS.filter(r=>S.stars>=r).length-1;
 const MATS=['Verdant Seed','Ember Shard','Frost Core','Sky Feather','Spirit Dust'];// by 3D biome index: meadow, caldera, frost, ruins, swamp
-function equipped(){let idx;if(S.builds&&S.builds[S.bi||0])idx=S.builds[S.bi||0].load;else idx=(S.load||[0,1,2,3]);return idx.slice(0,4).map(i=>S.g.spells[i]).filter(Boolean)}
+function equipped(){let idx;if(S.builds&&S.builds[S.bi||0])idx=S.builds[S.bi||0].load;else idx=(S.load||[0,1,2,3]);return idx.slice(0,4).map(i=>i==null?null:S.g.spells[i]||null)}
 let SP=equipped();
 let best=0;try{best=+localStorage.getItem('grimoire3d_best')||0}catch(e){}
-$('who').innerHTML=HAS_SAVE?`Your mage: <b style="color:${ECOL}">${S.g.name}</b> · Lv ${S.lv}<br><span style="font-size:13px">Build: ${SP.map(s=>s.name).join(' · ')||'no spells'}</span>`:
+$('who').innerHTML=HAS_SAVE?`Your mage: <b style="color:${ECOL}">${S.g.name}</b> · Lv ${S.lv}<br><span style="font-size:13px">Build: ${SP.filter(Boolean).map(s=>s.name).join(' · ')||'no spells'}</span>`:
   'No 2D save found, so you play as a temporary level 1 Fire mage (progress is not saved). <a href="./">Take the Trial first</a> to bring your own magic.';
 
 // ---------- renderer / scene ----------
@@ -161,6 +161,7 @@ function animPlayer(dt,moving){if(P.dead){if(PM.cur!==PM.acts.Death_A)oneShot(PM
 // ---------- player ----------
 const M=makeMage(ECOL,'#2a2042','#f1c27d');part(M.armR,new THREE.BoxGeometry(.45,.55,.14),mat('#c9a54a',{emissive:ECOL,emissiveIntensity:.6}),0,-.95,.2);
 const PM=MODELS.mage?rig('mage',1.25,ECOL,.3):null,PG=PM?PM.g:M.g;scene.add(PG);
+const shieldM=new THREE.Mesh(new THREE.SphereGeometry(1.7,24,16),new THREE.MeshBasicMaterial({color:'#7ac8ff',transparent:true,opacity:.25,depthWrite:false,blending:THREE.AdditiveBlending}));shieldM.visible=false;scene.add(shieldM);
 const P={x:0,z:8,y:0,vy:0,on:true,face:Math.PI,hpMax:S.hpMax,mpMax:S.mpMax,inv:0,dashT:0,dashCd:0,dead:0,ph:0,castT:0,dustT:0,sh:0,exh:0};P.hp=P.hpMax;P.mp=P.mpMax;
 const villagers=[];
 function addVillager(cx,cz,role,i){const VR=MODELS.knight?rig('knight',1.2,['#ffffff','#c8d8ff','#ffd8c8','#d8ffd8'][i%4],.25):null;const v=VR?{g:VR.g,R:VR}:makeMage('#8a5a3a','#4a3a2a','#e8b888');scene.add(v.g);
@@ -168,7 +169,11 @@ function addVillager(cx,cz,role,i){const VR=MODELS.knight?rig('knight',1.2,['#ff
 ['patrol','worker','sit','train'].forEach((r,i)=>addVillager(0,0,r,i));
 {const dg=new THREE.Group(),dx=5,dz=-9.5,y=H(dx,dz);part(dg,new THREE.CylinderGeometry(.15,.15,2.4,6),mat('#6a4a2a'),0,1.2,0);part(dg,new THREE.BoxGeometry(1.6,.2,.2),mat('#6a4a2a'),0,1.7,0);
  part(dg,new THREE.SphereGeometry(.4,8,6),mat('#c8a860'),0,2.5,0);part(dg,new THREE.CylinderGeometry(.45,.4,.9,8),mat('#c8a860'),0,1.6,0);dg.position.set(dx,y,dz);scene.add(dg);addObst(dx,dz,.6)}
-function villTick(dt){for(const v of villagers){let anim='Idle',to=null;
+function villTick(dt){for(const v of villagers){let anim='Idle',to=null;const vz=ZONES.find(z=>z.x===v.cx&&z.z===v.cz)||{r:20},th=enemies.find(e=>Math.hypot(e.x-v.cx,e.z-v.cz)<vz.r+10);
+  if(th){const a=Math.atan2(th.z-v.cz,th.x-v.cx)+(v.i%3-1)*.25,px=v.cx+Math.cos(a)*(vz.r-1.6),pz=v.cz+Math.sin(a)*(vz.r-1.6),dx=px-v.x,dz=pz-v.z,d=Math.hypot(dx,dz);
+    if(d>.5){const st=Math.min(d,4.2*dt);v.x+=dx/d*st;v.z+=dz/d*st;collide(v,.5);v.face=Math.atan2(dx,dz);anim='Running_A'}
+    else{v.face=Math.atan2(th.x-v.x,th.z-v.z);anim='1H_Melee_Attack_Chop';v.atk=(v.atk||0)-dt;if(v.atk<=0&&Math.hypot(th.x-v.x,th.z-v.z)<th.r+4.5){v.atk=1;hurt(th,4+S.lv)}}
+    if(v.R){play(v.R,anim);v.R.mixer.update(dt)}else{v.ph+=dt*9;animWalk(v,v.ph,.6)}v.g.position.set(v.x,H(v.x,v.z),v.z);v.g.rotation.y+=(((v.face-v.g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*8);continue}
   if(v.role==='patrol'){const z=ZONES.find(z=>z.x===v.cx&&z.z===v.cz),zr=z?z.r:20;v.a+=dt*.1;to=[v.cx+Math.cos(v.a)*(zr-3),v.cz+Math.sin(v.a)*(zr-3)]}
   else if(v.role==='sit')to=[v.cx+Math.cos(2.4+v.i)*3.3,v.cz+Math.sin(2.4+v.i)*3.3];
   else if(v.role==='train')to=[v.cx+5,v.cz-7.4];
@@ -191,7 +196,7 @@ $('go').onclick=()=>{$('start').remove();renderer.domElement.requestPointerLock(
 
 // ---------- spells from your 2D build ----------
 const KEYS=['Q','E','L-Click','R-Click'],CD=SP.map(()=>0);
-function buildHud(){$('skills').innerHTML=SP.map((s,i)=>`<div class="sk"><b>${KEYS[i]}</b>${s.name.length>16?s.name.slice(0,15)+'…':s.name}<i id="cd_${i}" style="height:0"></i></div>`).join('')}buildHud();
+function buildHud(){$('skills').innerHTML=SP.map((s,i)=>`<div class="sk"><b>${KEYS[i]}</b>${!s?'—':s.name.length>16?s.name.slice(0,15)+'…':s.name}<i id="cd_${i}" style="height:0"></i></div>`).join('')}buildHud();
 const fwd=()=>new THREE.Vector3(-Math.sin(cam.yaw),0,-Math.cos(cam.yaw));
 function target(from){const f=fwd();let best=null,bd=1e9;
   for(const e of enemies){const d=new THREE.Vector3(e.x-from.x,0,e.z-from.z),l=d.length();if(l>75||l<.1)continue;d.normalize();if(d.dot(f)<Math.cos(.45))continue;if(l<bd){bd=l;best=e}}
@@ -361,6 +366,7 @@ function update(dt){const started=!$('start'),now=performance.now();let moving=f
   if(moving&&P.on){P.ph+=dt*11;if((P.dustT-=dt)<=0){P.dustT=.22;burst(new THREE.Vector3(P.x,gy+.15,P.z),'#b8a888',2,2,.5)}}else P.ph*=.85;
   if(PM)animPlayer(dt,moving);else{animWalk(M,P.ph,moving&&P.on?.75:0);if(P.castT>0)M.armR.rotation.x=-2.2}PG.position.set(P.x,P.y+(moving&&P.on?Math.abs(Math.sin(P.ph))*.08:0),P.z);
   PG.rotation.y+=(((P.face-PG.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*12);PG.visible=!(P.inv>0&&Math.floor(P.inv*20)%2);
+  shieldM.visible=P.sh>0;if(P.sh>0){shieldM.position.set(P.x,P.y+1.4,P.z);const ss=1+Math.sin(performance.now()/180)*.05;shieldM.scale.set(ss,ss*1.15,ss);shieldM.material.opacity=Math.min(.38,.14+P.sh/220)}
   const zone=zoneAt(P.x,P.z);nearHouse=HOUSES.find(h=>Math.hypot(h.x-P.x,h.z-P.z)<6.8)||null;{const ci=ZONES.findIndex(z=>z.rev!==false&&Math.hypot(z.x-P.x,z.z-P.z)<5);nearCamp=ci<0?null:ci}
   if(zone){P.hp=Math.min(P.hpMax,P.hp+P.hpMax*.12*dt);P.mp=Math.min(P.mpMax,P.mp+20*dt)}else if(P.exh<=0)P.mp=Math.min(P.mpMax,P.mp+7*dt);
   villTick(dt);
@@ -410,7 +416,7 @@ function update(dt){const started=!$('start'),now=performance.now();let moving=f
   bannerT-=dt;if(bannerT<=0)$('banner').style.opacity=0;
   if((hudT+=dt)>.1){hudT=0;$('nm').innerHTML=`<b style="color:${ECOL}">${S.g.name}</b> · Lv ${S.lv} · ★${S.stars}`;$('hpb').style.width=Math.max(0,P.hp/P.hpMax*100)+'%';$('mpb').style.width=P.mp/P.mpMax*100+'%';$('xpb').style.width=(S.xp/xpNeed()*100)+'%';
     $('info').innerHTML=`HP ${Math.max(0,Math.ceil(P.hp))}/${P.hpMax}${P.sh?' · 🛡 '+P.sh:''} · Mana ${Math.floor(P.mp)} · XP ${S.xp}/${xpNeed()}<br>Wave ${wave} · Enemies ${enemies.length} · Kills ${kills} · Gold ${S.gold||0}<br>Region: ${BIO[bi].n}${keys.r?' · <b style="color:#ffd27a">OVERCHARGE</b>':''}`;
-    SP.forEach((s,i)=>{const el=$('cd_'+i);if(el){el.style.height=(CD[i]/((s.cd||0)+.6)*100)+'%';el.parentElement.style.opacity=P.mp<s.cost?.5:1}});
+    SP.forEach((s,i)=>{const el=$('cd_'+i);if(el&&s){el.style.height=(CD[i]/((s.cd||0)+.6)*100)+'%';el.parentElement.style.opacity=P.mp<s.cost?.5:1}});
     $('zone').textContent=nearCamp!=null?'Press F: manage '+ZONES[nearCamp].n:nearHouse?'Press F: open the '+nearHouse.n:zone?`Safe zone: ${zone.n}. Enemies can't enter, you heal here, and spells are sealed.`:'';drawMini()}}
 function frame(){const dt=Math.min(.05,clock.getDelta());if(!menuOpen)update(dt);if(composer)composer.render();else renderer.render(scene,camera);requestAnimationFrame(frame)}
 applyTowns();camera.position.set(0,12,24);frame();
