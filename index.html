@@ -117,17 +117,18 @@ function screenForge(){
   <p>Shape: <select id="fsh" onchange="prev()"><option value="">Bolt (default)</option><option value="beam">Beam: instant line, hits every enemy in it</option><option value="wave">Wave: short cone of 5 shots</option><option value="orb">Orb: circles you for 5s</option><option value="trap">Trap: explodes when an enemy steps on it</option><option value="wall">Wall: barrier that blocks shots (shields only)</option></select></p>
   <p>Power tier: <input id="fp" type="range" min="1" max="${cap}" value="3" oninput="prev()"> <span id="fpv"></span> <span class="mute">(max ${cap} at your level)</span></p>
   <p>Required drawback: <select id="fd" onchange="prev()"><option value="recoil">Recoil — hurts you</option><option value="cd">Long cooldown</option><option value="burn">Mana burn — costs much more</option><option value="exhaust">Exhaustion — no regen for 3s</option></select></p>
+  <p>Reduce the drawback with materials: <select id="fr" onchange="prev()">${REDT.map((x,i)=>`<option value="${i}">${x.n}${x.m?' · '+x.m+' materials'+(x.s?' + '+x.s+' Seal Fragment':''):''}</option>`).join('')}</select> <span class="mute">(uses your biggest material stacks; you have ${matTotal()})</span></p>
   <p>Catalyst (optional, consumed): <select id="fc" onchange="prev()"><option value="">None</option>${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<option value="${k}">${k} ×${v} — ${ITEMS[k]}</option>`).join('')}</select></p>
   <p id="fprev" class="card"></p><p id="ferr" style="color:var(--bad)"></p>
   <button onclick="forge()">Forge spell</button><button onclick="screenPages()">📜 Page Binding</button><button onclick="screenHub()">Back</button></div>
   <div class="card"><b>Restriction Pact</b> (${S.restr||0}/3)<p class="mute">Permanently give up 10% of your max HP for +8% power on every spell you own.</p><button ${(S.restr||0)>=3?'disabled':''} onclick="restrict()">Make the pact</button></div>`;prev();
 }
-function forgeSpell(){return shapeIt(buildSpell($('fk').value,+$('fp').value+($('fc').value==='Star Dust'?2:0),$('fd').value,$('fc').value),$('fsh').value)}
-function buildSpell(k,t,d,c){const m=S.g.mult,h=c==='Ancient Rune'?.5:1;
+function forgeSpell(){return shapeIt(buildSpell($('fk').value,+$('fp').value+($('fc').value==='Star Dust'?2:0),$('fd').value,$('fc').value,REDT[+(($('fr')||{}).value||0)].r),$('fsh').value)}
+function buildSpell(k,t,d,c,red){const m=S.g.mult,h=(c==='Ancient Rune'?.5:1)*(1-(red||0));
   const s={name:'',kind:k,power:Math.round({dmg:12,heal:12,shield:12,dot:5,summon:6,seal:4,copy:11}[k]*t*0.75*m+8),cost:4+t*4,cd:1,recoil:0,cur:0};
   if(c==='Ember Core')s.power=Math.round(s.power*1.2);
   if(d==='recoil')s.recoil=Math.round(t*3.5*h);if(d==='cd')s.cd=1+Math.ceil((1+t/2)*h);
-  if(d==='burn')s.cost=Math.round(s.cost*(1+.7*h));if(d==='exhaust')s.exhaust=1;
+  if(d==='burn')s.cost=Math.round(s.cost*(1+.7*h));if(d==='exhaust'&&(red||0)<.5)s.exhaust=1;
   if(c==='Mana Shard')s.cost=Math.round(s.cost*.7);return s;
 }
 function prev(){$('fpv').textContent=$('fp').value;$('fprev').innerHTML='Preview: '+desc(forgeSpell())}
@@ -136,6 +137,7 @@ function forge(){
   if(!/^[A-Za-z ]{3,24}$/.test(n))return $('ferr').textContent='Name must be 3–24 letters.';
   if(BANNED.test(n))return $('ferr').textContent='Please choose a family-friendly name.';
   const kreq={summon:8,seal:6,copy:10}[$('fk').value];if(kreq&&S.lv<kreq)return $('ferr').textContent='That magic unlocks at level '+kreq+'.';if(!S.forgePts)return $('ferr').textContent='You need a Forge point (earned every 3 levels).';if(S.g.spells.length>=16)return $('ferr').textContent='Your grimoire is full (16 spells).';
+  const rt=REDT[+$('fr').value||0];if(rt.m&&!payMats(rt.m,rt.s))return $('ferr').textContent='Not enough materials for that reduction.';
   const s=forgeSpell(),c=$('fc').value;s.name=n;if(c)S.inv[c]--;S.g.spells.push(s);S.forgePts--;fixLoad();autoEquip(S.g.spells.length-1);save();screenHub();
 }
 
@@ -845,6 +847,11 @@ function loadPicker(){if(LD.pick==null||!S.g.spells[LD.pick])return '';const l=S
   return '<div class="card" style="border-color:#ffd27a"><b>Assign "'+esc(S.g.spells[LD.pick].name)+'" to which key?</b><p>'+K.map((k,s)=>{const cur=l[s]!=null&&S.g.spells[l[s]]?S.g.spells[l[s]].name:'empty';
     return '<button onclick="assignSlot('+s+')">['+k+'] '+esc(cur)+'</button>'}).join(' ')+' <button onclick="LD.pick=null;screenLoadout()">Cancel</button></p><p class="mute">The spell already on that key is unequipped.</p></div>'}
 function assignSlot(s){const l=S.builds[S.bi].load;while(l.length<=s)l.push(null);const ex=l.indexOf(LD.pick);if(ex>=0)l[ex]=null;l[s]=LD.pick;LD.pick=null;fixLoad();save();sfx('pick');screenLoadout()}
+
+// ---------- FORGE: DRAWBACK REDUCTION WITH MATERIALS ----------
+const REDT=[{n:'None',r:0,m:0},{n:'Minor (−25%)',r:.25,m:3},{n:'Major (−50%, also removes Exhaustion)',r:.5,m:8},{n:'Masterwork (−75%)',r:.75,m:15,s:1}];
+function matTotal(){S.mats=S.mats||{};return MATS.reduce((a,k)=>a+(S.mats[k]||0),0)}
+function payMats(n,seal){S.mats=S.mats||{};if(matTotal()<n||(S.mats[SEAL]||0)<(seal||0))return false;for(let i=0;i<n;i++){const k=MATS.slice().sort((a,b)=>(S.mats[b]||0)-(S.mats[a]||0))[0];S.mats[k]--}if(seal)S.mats[SEAL]-=seal;return true}
 if(S)S.inv=S.inv||{};
 startTown();embedMenu();
 </script></body></html>
