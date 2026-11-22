@@ -162,8 +162,23 @@ function animPlayer(dt,moving){if(P.dead){if(PM.cur!==PM.acts.Death_A)oneShot(PM
 const M=makeMage(ECOL,'#2a2042','#f1c27d');part(M.armR,new THREE.BoxGeometry(.45,.55,.14),mat('#c9a54a',{emissive:ECOL,emissiveIntensity:.6}),0,-.95,.2);
 const PM=MODELS.mage?rig('mage',1.25,ECOL,.3):null,PG=PM?PM.g:M.g;scene.add(PG);
 const P={x:0,z:8,y:0,vy:0,on:true,face:Math.PI,hpMax:S.hpMax,mpMax:S.mpMax,inv:0,dashT:0,dashCd:0,dead:0,ph:0,castT:0,dustT:0,sh:0,exh:0};P.hp=P.hpMax;P.mp=P.mpMax;
-const villagers=[0,1,2,3].map(i=>{const VR=MODELS.knight?rig('knight',1.2,['#ffffff','#c8d8ff','#ffd8c8','#d8ffd8'][i],.25):null;const v=VR?{g:VR.g,R:VR}:makeMage(['#8a5a3a','#3a6a8a','#7a3a5a','#4a7a4a'][i],['#4a3a2a','#2a3a5a','#3a2a3a','#2a4a2a'][i],'#e8b888');scene.add(v.g);
-  const a=i*1.6;return Object.assign(v,{x:Math.cos(a)*8,z:Math.sin(a)*8,tx:0,tz:0,wait:Math.random()*3,ph:0,face:0})});
+const villagers=[];
+function addVillager(cx,cz,role,i){const VR=MODELS.knight?rig('knight',1.2,['#ffffff','#c8d8ff','#ffd8c8','#d8ffd8'][i%4],.25):null;const v=VR?{g:VR.g,R:VR}:makeMage('#8a5a3a','#4a3a2a','#e8b888');scene.add(v.g);
+  Object.assign(v,{cx,cz,role,i,x:cx+7+i,z:cz+5,tx:cx+9,tz:cz-3,ph:0,face:0,a:i*1.7,busy:0});villagers.push(v);return v}
+['patrol','worker','sit','train'].forEach((r,i)=>addVillager(0,0,r,i));
+{const dg=new THREE.Group(),dx=5,dz=-9.5,y=H(dx,dz);part(dg,new THREE.CylinderGeometry(.15,.15,2.4,6),mat('#6a4a2a'),0,1.2,0);part(dg,new THREE.BoxGeometry(1.6,.2,.2),mat('#6a4a2a'),0,1.7,0);
+ part(dg,new THREE.SphereGeometry(.4,8,6),mat('#c8a860'),0,2.5,0);part(dg,new THREE.CylinderGeometry(.45,.4,.9,8),mat('#c8a860'),0,1.6,0);dg.position.set(dx,y,dz);scene.add(dg);addObst(dx,dz,.6)}
+function villTick(dt){for(const v of villagers){let anim='Idle',to=null;
+  if(v.role==='patrol'){const z=ZONES.find(z=>z.x===v.cx&&z.z===v.cz),zr=z?z.r:20;v.a+=dt*.1;to=[v.cx+Math.cos(v.a)*(zr-3),v.cz+Math.sin(v.a)*(zr-3)]}
+  else if(v.role==='sit')to=[v.cx+Math.cos(2.4+v.i)*3.3,v.cz+Math.sin(2.4+v.i)*3.3];
+  else if(v.role==='train')to=[v.cx+5,v.cz-7.4];
+  else if(v.busy>0){v.busy-=dt;anim='Interact'}
+  else{if(Math.hypot(v.tx-v.x,v.tz-v.z)<.8){v.busy=3;const hs=v.cx===0&&HOUSES.length?HOUSES[Math.floor(Math.random()*HOUSES.length)]:null;
+      const p=hs?[hs.x*.74,hs.z*.74]:[v.cx+Math.cos(Math.random()*6.3)*9,v.cz+Math.sin(Math.random()*6.3)*9];v.tx=p[0];v.tz=p[1]}else to=[v.tx,v.tz]}
+  let moving=false;if(to){const dx=to[0]-v.x,dz=to[1]-v.z,d=Math.hypot(dx,dz);if(d>.45){const st=Math.min(d,2.4*dt);v.x+=dx/d*st;v.z+=dz/d*st;collide(v,.5);v.face=Math.atan2(dx,dz);moving=true}}
+  if(moving)anim='Walking_A';else if(v.role==='sit'){anim='Sit_Floor_Idle';v.face=Math.atan2(v.cx-v.x,v.cz-v.z)}else if(v.role==='train'){anim='1H_Melee_Attack_Chop';v.face=Math.atan2(v.cx+5-v.x,v.cz-9.5-v.z)}
+  if(v.R){play(v.R,anim);v.R.mixer.update(dt)}else{if(moving)v.ph+=dt*7;animWalk(v,v.ph,moving?.6:0)}
+  v.g.position.set(v.x,H(v.x,v.z),v.z);v.g.rotation.y+=(((v.face-v.g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*6)}}
 const cam={yaw:0,pitch:.38,dist:14};
 const keys={};let locked=false;
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=1;if(k===' ')e.preventDefault();if(e.repeat)return;if(k==='q')castSlot(0);if(k==='e')castSlot(1);if(k==='shift')dash();if(k==='f'){if(nearCamp!=null)openTown(nearCamp);else if(nearHouse)openMenu(nearHouse.menu)}});
@@ -214,7 +229,7 @@ const ZMAT=i=>['Verdant Seed','Ember Shard','Frost Core','Sky Feather','Spirit D
 S.towns3d=S.towns3d||[{lv:2},{lv:0},{lv:0},{lv:0},{lv:0}];const TW=S.towns3d;
 function zname(i){const lv=TW[i].lv;return i===0?(lv>=3?'City of Beginnings':'Town of Beginnings'):ZONES[i].b+' '+TITLES[lv]}
 const revealedZ=i=>i<=1||TW[i-1].lv>=2;
-function applyTowns(){ZONES.forEach((z,i)=>{z.rev=revealedZ(i);z.n=zname(i);z.base.visible=z.rev;const lv=TW[i].lv;z.r=i===0?(lv>=3?30:24):RADII[lv];
+function applyTowns(){ZONES.forEach((z,i)=>{z.rev=revealedZ(i);if(i>0&&z.rev){z.vn=z.vn||0;const want=[0,1,2,3][TW[i].lv];while(z.vn<want){addVillager(z.x,z.z,['patrol','worker','sit'][z.vn],z.vn+i);z.vn++}}z.n=zname(i);z.base.visible=z.rev;const lv=TW[i].lv;z.r=i===0?(lv>=3?30:24):RADII[lv];
   z.ring.geometry.dispose();z.ring.geometry=new THREE.RingGeometry(z.r-.7,z.r,96);z.light.distance=z.r*2.6;buildTown(i)})}
 function buildTown(i){const z=ZONES[i],lv=TW[i].lv;if(z.grp)z.base.remove(z.grp);const g=new THREE.Group();z.obs=[];
   const add=(m,x,zz,r)=>{m.position.x+=z.x+x;m.position.z+=z.z+zz;m.position.y+=H(z.x+x,z.z+zz);m.castShadow=m.receiveShadow=true;g.add(m);if(r)z.obs.push({x:z.x+x,z:z.z+zz,r})};
@@ -328,9 +343,7 @@ function update(dt){const started=!$('start'),now=performance.now();let moving=f
   PG.rotation.y+=(((P.face-PG.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*12);PG.visible=!(P.inv>0&&Math.floor(P.inv*20)%2);
   const zone=zoneAt(P.x,P.z);nearHouse=HOUSES.find(h=>Math.hypot(h.x-P.x,h.z-P.z)<6.8)||null;{const ci=ZONES.findIndex(z=>z.rev!==false&&Math.hypot(z.x-P.x,z.z-P.z)<5);nearCamp=ci<0?null:ci}
   if(zone){P.hp=Math.min(P.hpMax,P.hp+P.hpMax*.12*dt);P.mp=Math.min(P.mpMax,P.mp+20*dt)}else if(P.exh<=0)P.mp=Math.min(P.mpMax,P.mp+7*dt);
-  for(const v of villagers){if(v.wait>0){v.wait-=dt;v.ph*=.85}else{const dx=v.tx-v.x,dz=v.tz-v.z,d=Math.hypot(dx,dz);if(d<.5){v.wait=2+Math.random()*4;const a=Math.random()*6.283,r=4+Math.random()*9;v.tx=Math.cos(a)*r;v.tz=Math.sin(a)*r}
-      else{v.x+=dx/d*2.2*dt;v.z+=dz/d*2.2*dt;collide(v,.6);v.face=Math.atan2(dx,dz);v.ph+=dt*7}}
-    if(v.R){play(v.R,v.wait>0?'Idle':'Walking_A');v.R.mixer.update(dt)}else animWalk(v,v.ph,v.wait>0?0:.6);v.g.position.set(v.x,H(v.x,v.z),v.z);v.g.rotation.y+=(((v.face-v.g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*6)}
+  villTick(dt);
   if(started&&!P.dead){waveAge+=dt;waveT-=dt;if((enemies.length===0&&waveT<=0)||waveAge>40){spawnWave();waveT=3}if(enemies.length===0&&waveT>3)waveT=3}
   for(const e of [...enemies]){const dx=P.x-e.x,dz=P.z-e.z,d=Math.hypot(dx,dz)||1;e.ph+=dt;let sp=e.T.spd*dt*(e.frz>0?0:e.slw>0?.4:1);e.frz-=dt;e.slw-=dt;e.sealT-=dt;
     if(e.dotT>0){const before=Math.ceil(e.dotT);e.dotT-=dt;if(Math.ceil(e.dotT)<before){hurt(e,e.dot);if(!enemies.includes(e))continue}}
