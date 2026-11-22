@@ -14,6 +14,8 @@ A 2D pixel-art magic platformer that runs in the browser.
 
 Or download and open `index.html` locally.
 
+3D character models: [KayKit Adventurers & Skeletons](https://kaylousberg.itch.io/kaykit-adventurers) by Kay Lousberg (CC0), thank you!
+
 **New: [3D open-world prototype](https://newnyansan.github.io/grimoire-trials/3d.html)**: explore five regions with your mage, survive endless waves, and heal in safe zones (desktop, mouse + keyboard).
 No install needed. Progress saves in your browser.
 
