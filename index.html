@@ -93,7 +93,7 @@ function screenHub(){
   const g=S.g,need=xpNeed();
   app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><h2 class="r${g.rarity}">${g.name} <span class="mute">(${RARITY[g.rarity]} · ${'✦'.repeat(g.marks||3)})</span></h2><p class="mute">Element family: ${[g.el,g.el2].filter(Boolean).map(x=>(FAMOF(x)||'none')).join(' + ')}</p>
   <p>Level ${S.lv} · XP ${S.xp}/${need} · HP ${S.hpMax} · Mana ${S.mpMax} · Best wave ${S.best}</p>${bar(S.xp,need,'var(--acc)')}
-  ${spellList(g.spells)}<p><b>Story:</b> ${storyLine()}</p>${S.pact?'<p><b>Pact:</b> '+(S.pact==='spirit'?'Spirit':'Dark')+' (press T in battle)</p>':''}<p><b>Techniques</b> <span class="mute">(unlock by leveling)</span></p>${TECH.map(t=>`<div class="${S.lv>=t[1]?"":"mute"}">${S.lv>=t[1]?"✔":"🔒 Lv "+t[1]} <b>${t[0]}</b> — ${t[2]}</div>`).join("")}<p><b>Combos</b> <span class="mute">(cast two different spells within 1s)</span></p><div class="mute">${Object.entries(COMBOS).map(([k,v])=>`<b>${v}</b>: ${k.split('>').map(x=>KN[x]).join(' → ')} (${COMBO_INFO[v]})`).join('<br>')}</div><p class="mute">Materials: ${Object.entries(S.mats||{}).filter(x=>x[1]).map(([k,v])=>k+' ×'+v).join(', ')||'none yet (enemies drop them)'}</p><p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
+  ${spellList(g.spells)}<p><b>Rank:</b> ${RANKS[rankIdx()][0]} ★${S.stars||0}${S.squad?' · <b style="color:'+SQ[S.squad].col+'">'+SQ[S.squad].n+'</b>':''}</p><p><b>Story:</b> ${storyLine()}</p>${S.pact?'<p><b>Pact:</b> '+(S.pact==='spirit'?'Spirit':'Dark')+' (press T in battle)</p>':''}<p><b>Techniques</b> <span class="mute">(unlock by leveling)</span></p>${TECH.map(t=>`<div class="${S.lv>=t[1]?"":"mute"}">${S.lv>=t[1]?"✔":"🔒 Lv "+t[1]} <b>${t[0]}</b> — ${t[2]}</div>`).join("")}<p><b>Combos</b> <span class="mute">(cast two different spells within 1s)</span></p><div class="mute">${Object.entries(COMBOS).map(([k,v])=>`<b>${v}</b>: ${k.split('>').map(x=>KN[x]).join(' → ')} (${COMBO_INFO[v]})`).join('<br>')}</div><p class="mute">Materials: ${Object.entries(S.mats||{}).filter(x=>x[1]).map(([k,v])=>k+' ×'+v).join(', ')||'none yet (enemies drop them)'}</p><p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
   <button onclick="startFight()">Fight wave ${S.wave}</button>
   <button onclick="screenTree()">Skill Trees</button><button onclick="screenBackup()">Backup</button><button onclick="screenLoadout()">Builds (using ${(S.bi||0)+1})</button><button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
   <button onclick="if(confirm('Abandon this grimoire and retake the trial?')){localStorage.removeItem('grimoire');S=null;app.innerHTML=''}">New grimoire</button><button onclick="app.innerHTML=''">Close</button></p>
@@ -153,12 +153,12 @@ addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)
 document.querySelectorAll('#touch [data-k]').forEach(b=>{const k=b.dataset.k;b.onpointerdown=()=>keys[k]=1;b.onpointerup=b.onpointerleave=()=>keys[k]=0});
 const busy=()=>app.childElementCount>0;
 const STATIONS=[{x:4,name:'Trial Shrine',go:()=>screenStart()},{x:11,name:'Grimoire Lectern',need:1,go:()=>screenHub()},
-  {x:18,name:'Spell Forge',need:1,go:()=>screenForge()},{x:22,name:'Spell Sage',need:1,go:()=>screenSage()},{x:26,name:'Portal',need:1,go:()=>screenPortal()}];
+  {x:14,name:'Knight Hall',need:1,go:()=>screenHall()},{x:18,name:'Spell Forge',need:1,go:()=>screenForge()},{x:22,name:'Spell Sage',need:1,go:()=>screenSage()},{x:26,name:'Portal',need:1,go:()=>screenPortal()}];
 function nearStation(){return G&&G.mode==='town'&&STATIONS.find(s=>Math.abs(G.p.x+4-(s.x*T+8))<20)}
 function interact(){if(busy())return;const s=nearStation();if(!s)return;if(s.need&&!S)return say('Take the Trial at the shrine first!');s.go()}
 function startTown(){
   const cols=32,grid=[];for(let x=0;x<cols;x++){const c=new Array(12).fill(0);for(let y=9;y<12;y++)c[y]=1;grid.push(c)}
-  G={mode:'town',bio:BIOMES[0],fires:[],parts:[],shake:0,air:0,dashT:0,eproj:[],grid,cols,en:[],sc:1,p:{x:S?11*T:2*T,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:1,mp:0,sh:0,exh:0,proj:[],pops:[],gcd:0,msgs:[],
+  G={mode:'town',pages:[],bio:BIOMES[0],fires:[],parts:[],shake:0,air:0,dashT:0,eproj:[],grid,cols,en:[],sc:1,p:{x:S?11*T:2*T,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:1,mp:0,sh:0,exh:0,proj:[],pops:[],gcd:0,msgs:[],
      banner:S?'':'Walk to the Trial Shrine and press E',bT:S?0:600,t:0,acc:0,last:performance.now(),running:1,c:$('cv').getContext('2d')};
   music('town');$('ttl').textContent='Town of Beginnings';$('hud').innerHTML='<div id="hs"></div>';
   $('help').innerHTML='Move ←/→ or A/D · Jump Space/W/↑ · Use a building: walk up to it and press E (or ↓ / Act) · Esc closes menus · M mutes sound';
@@ -168,13 +168,14 @@ function drawStation(c,s,x,y,t){const ec=S?elc():'#c9a54a';
   if(s.x===4){c.fillStyle='#8a8aa0';c.fillRect(x-6,y-30,4,30);c.fillRect(x+18,y-30,4,30);c.fillRect(x-8,y-34,32,4);c.fillStyle=t%40<20?'#e0d0ff':'#b090ff';c.fillRect(x+4,y-20,8,8);glow(c,x+8,y-16,20,'rgba(200,170,255,.45)')}
   if(s.x===11){c.fillStyle='#6b4a2b';c.fillRect(x+6,y-14,4,14);c.fillRect(x,y-18,16,4);c.fillStyle=ec;c.fillRect(x+2,y-22,12,4)}
   if(s.x===18){c.fillStyle='#333';c.fillRect(x-2,y-10,20,4);c.fillRect(x+4,y-6,8,6);c.fillStyle=['#ff6a3d','#ffb020','#ffe14d'][Math.floor(t/8)%3];c.fillRect(x+20,y-8-(t%16<8?2:0),6,8);glow(c,x+23,y-6,18,'rgba(255,140,50,.5)')}
+  if(s.x===14){c.fillStyle='#5a4a3a';c.fillRect(x+2,y-34,2,34);c.fillRect(x+14,y-34,2,34);c.fillStyle=S&&S.squad?SQ[S.squad].col:'#8a2a2a';const wv=Math.sin(t/12)>0?1:0;c.fillRect(x+4,y-32,10,14+wv);c.fillStyle='#ffd040';c.fillRect(x+7,y-27,4,4)}
   if(s.x===22){spr(c,SPR.me,x+4,y-12,{h:'#ddd',s:'#f1c27d',e:'#000',k:'#222',b:'#fff'},'#556',1,false);c.fillStyle='#ffd700';c.font='8px monospace';if(t%60<40)c.fillText('?',x+14,y-16)}
   if(s.x===26){for(let a=0;a<24;a++){const r=a/24*6.283+t/30;c.fillStyle=a%2?'#a070ff':'#5a3aa0';c.fillRect(x+6+Math.cos(r)*10,y-18+Math.sin(r)*16,3,3)}glow(c,x+7,y-17,24,'rgba(160,110,255,.4)')}
   c.font='8px monospace';c.textAlign='center';c.fillStyle='#ece8f5';c.fillText(s.name,x+8,y-40);c.textAlign='left'}
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0;if(e.key==='Shift')keys.shift=0;});
 
 function startFight(){
-  const st=arguments[0]&&arguments[0].w?arguments[0]:null,w=st?st.w:S.wave,sc=Math.pow(st?1.1:1.18,w-1),boss=st?st.obj==='boss':w%5===0,r=rng(w*7919+S.g.seed),cols=60+w*4,grid=[],tk=Object.keys(TRAITS);const bio=st&&st.final?BIOMES[5]:BIOMES[Math.floor((w-1)/5)%5];
+  const st=arguments[0]&&arguments[0].w?arguments[0]:null,w=st?st.w:S.wave,sc=Math.pow(st?1.1:1.18,w-1),boss=st?st.obj==='boss':w%5===0,r=rng(w*7919+S.g.seed),cols=60+w*4,grid=[],tk=Object.keys(TRAITS);const bio=st&&st.dungeon?BIOMES[6]:st&&st.final?BIOMES[5]:BIOMES[Math.floor((w-1)/5)%5];
   let h=3;
   while(grid.length<cols){const x=grid.length,col=new Array(12).fill(0);
     if(x>8&&x<cols-14&&r()<bio.gap){grid.push(col);if(r()<.5)grid.push(new Array(12).fill(0));continue}
@@ -188,18 +189,21 @@ function startFight(){
     const fm=w<2?null:Object.keys(FAM)[Math.floor(r()*6)];en.push({fam:fm,name:(b?'Boss ':'')+FOES[fi],col:fm?FAMCOL[fm]:`hsl(${fi*47%360},65%,55%)`,boss:b,tr,x:cx*T,y:0,w:b?16:8,h:b?16:8,vx:(r()<.5?-1:1)*(tr.includes('swift')?1:.5),vy:0,
       hp:Math.round((b?150:25)*sc),atk:Math.round((b?14:8)*sc),dot:0,dotT:0})}
   for(let i=0;i<n;i++)spawn(14+Math.floor((cols-30)*i/n+r()*3),false);
-  if(boss){spawn(cols-9,true);const bi=bio.boss,bz=en[en.length-1];bz.name=BOSSES[bi][0];bz.pat=[BOSSES[bi][1]].concat(bi===4?['charge']:[]).concat(w>=30?[BOSSES[(bi+1)%5][1]]:[]);if(st&&st.awaken){bz.name='Shadow of '+S.g.name;bz.pat=['shoot','charge','ward'];bz.col=elc()}if(st&&st.final){bz.name='Archmage Veyl';bz.pat=BOSSES.map(b=>b[1]);bz.hp=Math.round(bz.hp*1.6);bz.col='#a040ff'}bz.bt=0}
+  if(boss){spawn(cols-9,true);const bi=bio.boss,bz=en[en.length-1];bz.name=BOSSES[bi][0];bz.pat=[BOSSES[bi][1]].concat(bi===4?['charge']:[]).concat(w>=30?[BOSSES[(bi+1)%5][1]]:[]);if(st&&st.rival){const wn=S.rivalWins||0,mf=Object.keys(BEATS).find(f=>BEATS[f]===FAMOF(S.g.el))||'shadow';bz.name='Rival '+RIVAL;bz.type='mage';bz.w=16;bz.h=24;bz.fam=mf;bz.col=FAMCOL[mf];
+    bz.pat=['shoot','ward'].concat(wn>=2?['charge']:[]).concat(wn>=4?['summon']:[])}
+  if(st&&st.awaken){bz.name='Shadow of '+S.g.name;bz.pat=['shoot','charge','ward'];bz.col=elc()}if(st&&st.final){bz.name='Archmage Veyl';bz.pat=BOSSES.map(b=>b[1]);bz.hp=Math.round(bz.hp*1.6);bz.col='#a040ff'}bz.bt=0}
   const ros=w<=2?['slime','bat']:bio.roster;en.forEach(e=>{if(!e.boss){e.type=ros[Math.floor(r()*ros.length)];e.h=HOF[e.type];e.hp=Math.round(e.hp*(HPM[e.type]||1));e.atk=Math.round(e.atk*(ATKM[e.type]||1));
     if(e.type==='bat'||e.type==='ghost'){e.y=30+r()*50;e.by=e.y}e.name=TNAME[e.type]}e.hpMax=e.hp});
   const fc=cols-3;
-  G={mode:'fight',meter:0,frenzy:0,fams:[],orbs:[],traps:[],walls:[],beams:[],awaken:!!(st&&st.awaken),bio,story:st&&st.story,obj:st?st.obj:null,final:!!(st&&st.final),kills:0,killGoal:0,pages:[],fires:[],windDir:1,pvx:0,parts:[],shake:0,air:0,jPrev:0,dashT:0,dashCd:0,fly:false,hov:0,eproj:[],bossSeen:0,sp:(fixLoad(),S.load.map(i=>S.g.spells[i])),pas:S.builds[S.bi].pas||'',field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
+  G={mode:'fight',rival:!!(st&&st.rival),dungeon:!!(st&&st.dungeon),meter:0,frenzy:0,fams:[],orbs:[],traps:[],walls:[],beams:[],awaken:!!(st&&st.awaken),bio,story:st&&st.story,obj:st?st.obj:null,final:!!(st&&st.final),kills:0,killGoal:0,pages:[],fires:[],windDir:1,pvx:0,parts:[],shake:0,air:0,jPrev:0,dashT:0,dashCd:0,fly:false,hov:0,eproj:[],bossSeen:0,sp:(fixLoad(),S.load.map(i=>S.g.spells[i])),pas:S.builds[S.bi].pas||'',field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
      msgs:[],banner:'',bT:0,flagX:fc*T,flagY:grid[fc].indexOf(1)*T,lastSafe:24,t:0,acc:0,last:performance.now(),running:1};
   if(G.pas==='Mana Armor'&&has('Mana Armor'))G.armor=true;
   if(S.pact==='spirit')G.fams.push({spirit:1,x:G.p.x,y:G.p.y-14,l:1e9,dmg:Math.round(8+S.lv*1.5),el:S.g.el,cd:30});
+  if(S.squad==='wardens')G.sh=20+S.lv*2;
   G.killGoal=Math.ceil(en.filter(e=>!e.boss).length*.7);
-  if(G.obj==='pages')for(let i=0;i<3;i++){let cx=Math.floor(cols*(.22+.25*i)+r()*4);for(let k=0;k<8&&!grid[cx].includes(1);k++)cx++;const top=grid[cx].indexOf(1);G.pages.push({x:cx*T+8,y:(top<0?9:top)*T-(r()<.5?14:40),got:0})}
+  if(G.obj==='pages'||G.obj==='chests')for(let i=0;i<3;i++){let cx=Math.floor(cols*(.22+.25*i)+r()*4);for(let k=0;k<8&&!grid[cx].includes(1);k++)cx++;const top=grid[cx].indexOf(1);G.pages.push({x:cx*T+8,y:(top<0?9:top)*T-(G.obj==='chests'?6:r()<.5?14:40),got:0,chest:G.obj==='chests'})}
   G.sp.forEach(s=>s.cur=0);
-  music('fight');app.innerHTML='';$('ttl').textContent=st?(st.awaken?'Awakening Trial':st.final?'The Hollow Citadel — Final Battle':`${bio.n} — Stage ${st.story.s+1}/4`):`Wave ${w} · ${bio.n}${boss?' — BOSS':''}`;
+  music('fight');app.innerHTML='';$('ttl').textContent=st?(st.rival?'Rival Duel: '+RIVAL:st.dungeon?'Forgotten Crypt (Dungeon)':st.awaken?'Awakening Trial':st.final?'The Hollow Citadel — Final Battle':`${bio.n} — Stage ${st.story.s+1}/4`):`Wave ${w} · ${bio.n}${boss?' — BOSS':''}`;
   hudButtons();
   $('help').innerHTML=`Move <b>A/D</b> · Jump <b>W/Space</b> · Skills <b>Q E R F</b> (or 1–4) · Basic attack <b>left click / J</b> · Dash <b>Shift</b> · Overcharge: hold <b>right click / K</b> while casting · Enhance: hold <b>C</b> · Armor <b>Z</b> · Field <b>G</b> · Flight <b>V</b> · Pact <b>T</b> · Swap build <b>Tab</b> (techniques as you unlock them) · P/Esc pause · M mutes sound<br>Enemy color = element: <b style="color:#ff6a3d">fire</b> beats <b style="color:#5fd068">nature</b> beats <b style="color:#ffe14d">storm</b> beats <b style="color:#3da5ff">water</b> beats fire; <b style="color:#fff3b0">light</b> and <b style="color:#a070ff">shadow</b> beat each other. Cast two different spells within 1s for a combo. · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · P/Esc pauses.
   Letters above enemies = traits: ${Object.entries(TRAITS).map(([k,v])=>`<b>${k[0].toUpperCase()}</b> ${v}`).join(' · ')}`;
@@ -234,7 +238,7 @@ const has=n=>!!S&&S.lv>=TECH.find(t=>t[0]===n)[1];
 const overflow=()=>has('Mana Overflow')&&G.hp<S.hpMax*.2;
 const costOf=(s,o)=>Math.round(s.cost*(o?2:1)*(G.field>0?.7:1));
 function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.sp[i],p=G.p;if(!s||s.cur>0||G.gcd>0)return;
-  const c=costOf(s,o),ovf=overflow();let pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1)*(G.pas==='Arcane Focus'?1.15:1)*(S.pact==='spirit'?1.1:S.pact==='dark'?1.3:1));
+  const c=costOf(s,o),ovf=overflow();let pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1)*(G.pas==='Arcane Focus'?1.15:1)*(S.pact==='spirit'?1.1:S.pact==='dark'?1.3:1)*(S.squad==='lions'&&G.hp>S.hpMax*.5?1.15:1)*(1+.03*rankIdx()));
   if(ovf){if(G.hp<=Math.ceil(c/2)+1)return;G.hp-=Math.ceil(c/2)}else{if(G.mp<c)return;G.mp-=c}
   s.cur=Math.round((s.cd+.6)*60);G.gcd=15;burst(p.x+(p.dir>0?9:-1),p.y+6,elc(),6,1.2);sfx('cast');if(o)say('OVERCHARGE: '+s.name+'!');
   let combo=null,xfx=[],det=0;if(G.last&&G.t-G.last.t<60&&G.last.i!==i)combo=COMBOS[G.last.k+'>'+s.kind];G.last={i,k:s.kind,t:G.t};
@@ -242,8 +246,8 @@ function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.
     if(/Bulwark/.test(combo))xfx.push('pierce');if(/Life/.test(combo))xfx.push('drain');if(/Plague/.test(combo))xfx.push('multi');if(/Detonation/.test(combo))det=1;pw=Math.round(pw);G.last=null}
   if(s.kind==='dmg'||s.kind==='dot'){const fx=[...(s.fx||[]),...xfx];const mk=(vy,life)=>({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life});
   if(!shapeCast(s,mk,pw))for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
-  if(s.kind==='heal'){G.hp=Math.min(S.hpMax,G.hp+pw);pop(p,'+'+pw,'#4caf7d')}
-  if(s.kind==='shield'){if(s.shape==='wall'){G.walls.push({x:p.x+(p.dir>0?12:-8),y:p.y-14,w:5,h:28,l:360,col:elc()});pop(p,'barrier!','#4a8fd9')}else{G.sh+=pw;pop(p,'+'+pw+' shield','#4a8fd9')}}
+  if(s.kind==='heal'){const hv=Math.round(pw*(S.squad==='hearts'?1.3:1));G.hp=Math.min(S.hpMax,G.hp+hv);pop(p,'+'+hv,'#4caf7d')}
+  if(s.kind==='shield'){if(s.shape==='wall'){G.walls.push({x:p.x+(p.dir>0?12:-8),y:p.y-14,w:5,h:28,l:360,col:elc()});pop(p,'barrier!','#4a8fd9')}else{const sv=Math.round(pw*(S.squad==='wardens'?1.25:1));G.sh+=sv;pop(p,'+'+sv+' shield','#4a8fd9')}}
   if(s.kind==='summon'){if(G.fams.filter(f=>!f.spirit).length>=2)G.fams.splice(G.fams.findIndex(f=>!f.spirit),1);G.fams.push({x:p.x,y:p.y-10,l:720,dmg:pw,el:s.el||S.g.el,cd:20});pop(p,'familiar!','#ffd700')}
   if(s.kind==='seal'){const t=G.en.filter(e=>!e.dead&&(e.x-p.x)*p.dir>-8&&Math.abs(e.x-p.x)<160&&Math.abs(e.y-p.y)<60).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];
     if(t){t.sealT=t.boss?60:180;t.frz=t.sealT;t.wind=0;t.chg=0;pop(t,'SEALED','#e0c0ff');burst(t.x+4,t.y+4,'#e0c0ff',16,1.5)}else pop(p,'no target','#aaa')}
@@ -251,7 +255,7 @@ function cast(i,o){if(!G||!G.running||G.mode!=='fight'||busy())return;const s=G.
   if(s.recoil){G.hp-=s.recoil;pop(p,'-'+s.recoil,'#d9534f')}
   if(s.exhaust)G.exh=180;updHud()}
 function melee(){if(!G||G.mode!=='fight'||G.mel>0||!has('Weapon Infusion'))return;const p=G.p;G.mel=24;G.swing=10;
-  const arc=tup('Arc Slash'),hb={x:p.dir>0?p.x+8:p.x-(arc?22:14),y:p.y-(arc?6:2),w:arc?22:14,h:arc?24:16};const nl=S.g.el==='Null';if(nl)G.mel=14;sfx('swing');G.en.forEach(e=>{if(!e.dead&&ov(hb,e)){if(e.type==='knight'&&!nl&&(G.p.x-e.x)*e.face>0)return pop(e,'blocked','#ccc');hurt(e,Math.round((6+S.lv*2)*(arc?1.5:1)*(G.frenzy>0?2:1)*(nl?3:affMul(S.g.el,e))),nl)}});
+  const arc=tup('Arc Slash'),hb={x:p.dir>0?p.x+8:p.x-(arc?22:14),y:p.y-(arc?6:2),w:arc?22:14,h:arc?24:16};const nl=S.g.el==='Null';if(nl)G.mel=14;sfx('swing');G.en.forEach(e=>{if(!e.dead&&ov(hb,e)){if(e.type==='knight'&&!nl&&(G.p.x-e.x)*e.face>0)return pop(e,'blocked','#ccc');hurt(e,Math.round((6+S.lv*2)*(arc?1.5:1)*(G.frenzy>0?2:1)*(S.squad==='lions'&&G.hp>S.hpMax*.5?1.15:1)*(nl?3:affMul(S.g.el,e))),nl)}});
   if(nl)G.eproj=G.eproj.filter(q=>!ov({x:q.x,y:q.y,w:4,h:4},hb))}
 function field(){if(!has('Mana Field'))return;if(G.fieldCd>0)return say('Mana Field recharging…');if(G.mp<30)return say('Need 30 mana');
   G.mp-=30;G.field=tup('Grand Field')?600:360;G.fieldCd=1200;say('Mana Field!')}
@@ -262,7 +266,7 @@ function techLine(){const t=[];if(S.pact)t.push((S.pact==='spirit'?'Spirit':'Dar
 function step(){
   const b0=busy(),p=G.p,L=!b0&&(keys.arrowleft||keys.a)?1:0,R=!b0&&(keys.arrowright||keys.d)?1:0,J=!b0&&(keys[' ']||keys.w||keys.arrowup);G.t++;
   const enh=G.mode==='fight'&&has('Physical Enhancement')&&keys.c&&G.mp>1;G.enh=enh;if(enh)G.mp-=10/60;
-  p.vx=(R-L)*(enh?2.6:1.6)*(G.pas==='Swiftness'?1.2:1);if(p.vx)p.dir=Math.sign(p.vx);if(G.bio.haz==='ice'&&p.on&&G.mode==='fight')p.vx=G.pvx+(p.vx-G.pvx)*.07;G.pvx=p.vx;
+  p.vx=(R-L)*(enh?2.6:1.6)*(G.pas==='Swiftness'?1.2:1)*(S&&S.squad==='gale'&&G.mode==='fight'?1.15:1);if(p.vx)p.dir=Math.sign(p.vx);if(G.bio.haz==='ice'&&p.on&&G.mode==='fight')p.vx=G.pvx+(p.vx-G.pvx)*.07;G.pvx=p.vx;
   if(G.mode==='fight'&&S.pact==='dark'){if(G.meter>=100&&!(G.frenzy>0)){G.frenzy=180;G.meter=0;say('THE DARKNESS TAKES OVER!');sfx('boss')}
     if(G.frenzy>0){G.frenzy--;const t=G.en.filter(e=>!e.dead).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];if(t)p.dir=Math.sign(t.x-p.x)||p.dir;p.vx=p.dir*2.2;
       if(G.frenzy%15===0){G.mel=0;melee()}if(G.t%2===0)G.parts.push({x:p.x+Math.random()*8,y:p.y+Math.random()*12,vx:(Math.random()-.5),vy:-.6,l:20,c:'#a040ff',s:2})}}
@@ -270,7 +274,7 @@ function step(){
   if(G.dashT>0){G.dashT--;p.vx=p.dir*5;p.vy=-.35;burst(p.x+4,p.y+6,elc(),2,.5);if(tup('Phase Dash'))G.en.forEach(e=>{if(!e.dead&&!e.dashHit&&ov(p,e)){e.dashHit=1;hurt(e,6+S.lv*2)}})}
   if(G.fly){if(G.mp<=0){G.fly=false;say('Out of mana: flight ends')}else{G.mp-=12/60;p.vy=(J?-2:D?2:0)-.35}}
   else{if(J&&p.on){p.vy=enh?-7.4:-6.2;p.on=0;burst(p.x+4,p.y+12,'#d8c8a8',4,.8);sfx('jump')}
-    else if(jp&&!p.on&&G.air<(tup('Triple Jump')?2:1)&&has('Double Jump')){p.vy=enh?-6.6:-5.6;G.air++;pop(p,'^','#fff');sfx('jump')}
+    else if(jp&&!p.on&&G.air<(has('Double Jump')?1:0)+(tup('Triple Jump')?1:0)+(S&&S.squad==='gale'?1:0)){p.vy=enh?-6.6:-5.6;G.air++;pop(p,'^','#fff');sfx('jump')}
     if(!J&&p.vy<-2)p.vy=-2}
   const vyb=p.vy;move(p);if(p.on)G.air=0;if(p.on&&!G.wasOn&&vyb>3)burst(p.x+4,p.y+12,'#d8c8a8',6,1);G.wasOn=p.on;if(p.y<0){p.y=0;p.vy=0}
   G.hov=!G.fly&&G.mode==='fight'&&has('Hover')&&J&&!p.on&&p.vy>.6&&G.mp>0;if(G.hov){p.vy=.6;G.mp-=4/60}
@@ -284,7 +288,7 @@ function step(){
   G.still=(p.on&&!L&&!R&&!J&&!enh)?G.still+1:0;
   if(G.exh>0)G.exh--;else G.mp=Math.min(S.mpMax,G.mp+7/60*(has('Meditation')&&G.still>60?3:1)*(G.pas==='Mana Flow'?1.4:1));
   if(G.armor){G.mp-=(tup('Mana Skin')?1:2)/60;if(G.mp<=0){G.mp=0;G.armor=false;say('Mana Armor broke!')}}
-  G.field--;G.fieldCd--;G.mel--;G.swing--;G.dashCd--;
+  G.field--;G.fieldCd--;G.mel--;G.swing--;G.dashCd--;if(S.squad==='hearts')G.hp=Math.min(S.hpMax,G.hp+1/60);
   G.sp.forEach(s=>s.cur>0&&s.cur--);G.gcd--;p.inv--;if(G.bT>0)G.bT--;
   G.proj=G.proj.filter(q=>{if(G.t%2===0)G.parts.push({x:q.x+q.sz/2,y:q.y+q.sz/2,vx:-q.vx*.1+(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,l:16,c:q.dot?'#a6e22e':elc(),s:2});if(q.home){const t=G.en.filter(e=>!e.dead&&Math.abs(e.x-q.x)<100).sort((a,b)=>Math.abs(a.x-q.x)-Math.abs(b.x-q.x))[0];
       if(t)q.vy=Math.max(-2,Math.min(2,q.vy+Math.sign(t.y+t.h/2-q.y)*.3))}
@@ -345,7 +349,7 @@ function draw(){
     if(ns&&!busy()){c.font='bold 8px monospace';c.fillStyle='#ffd700';c.textAlign='center';c.fillText('[E] '+ns.name,ns.x*T-cam+8,9*T-50);c.textAlign='left'}}
   else{const fx=G.flagX-cam,locked=G.en.some(e=>e.boss&&!e.dead)||!objDone();
   c.fillStyle='#ccc';c.fillRect(fx,G.flagY-56,2,56);c.fillStyle=locked?'#d9534f':'#ffd700';for(let i=0;i<8;i++)c.fillRect(fx+2,G.flagY-56+i,12-i*1.5,1)}
-  for(const q of G.pages)if(!q.got){const y=q.y+Math.sin(G.t/15)*2;glow(c,q.x-cam,y,12,'rgba(255,240,170,.5)');c.fillStyle='#f5ecd0';c.fillRect(q.x-cam-3,y-4,6,8);c.fillStyle='#8a7a5a';c.fillRect(q.x-cam-2,y-2,4,1);c.fillRect(q.x-cam-2,y,4,1)}
+  for(const q of (G.pages||[]))if(!q.got){if(q.chest){const x=q.x-cam-5,y=q.y-2;glow(c,x+5,y+3,12,'rgba(255,210,90,.35)');c.fillStyle='#7a4a20';c.fillRect(x,y,10,8);c.fillStyle='#ffd040';c.fillRect(x,y+3,10,1);c.fillRect(x+4,y+2,2,3);continue}const y=q.y+Math.sin(G.t/15)*2;glow(c,q.x-cam,y,12,'rgba(255,240,170,.5)');c.fillStyle='#f5ecd0';c.fillRect(q.x-cam-3,y-4,6,8);c.fillStyle='#8a7a5a';c.fillRect(q.x-cam-2,y-2,4,1);c.fillRect(q.x-cam-2,y,4,1)}
   for(const e of G.en){if(e.dead)continue;const x=e.x-cam;if(x<-20||x>W+20)continue;
     const ey=e.y+(e.on&&Math.sin(G.t/5+e.x)>.7?1:0);c.fillStyle='rgba(0,0,0,.3)';c.fillRect(x+1,e.y+e.h-1,e.w-2,2);const ES=eSpr(e);if(e.type==='ghost')c.globalAlpha=e.vis?.85:.22;outline(c,ES[0],x,ey,e.boss?2:1,e.vx<0);spr(c,ES[0],x,ey,ES[1],e.wind>0&&G.t%6<3?'#fff':e.frz>0?'#9ee7ff':e.col,e.boss?2:1,e.vx<0);c.globalAlpha=1;
     if(e.boss){c.fillStyle='#eee';c.fillRect(x+2,e.y-3,2,4);c.fillRect(x+12,e.y-3,2,4)}if(e.ward){c.strokeStyle='#7ddc6a';c.strokeRect(x-2.5,e.y-2.5,e.w+5,e.h+5)}if(e.sealT>0){c.strokeStyle='#e0c0ff';c.strokeRect(x-1.5,e.y-1.5,e.w+3,e.h+3);c.fillStyle='#e0c0ff';c.fillRect(x+e.w/2-1,e.y-8,2,2)}
@@ -358,6 +362,7 @@ function draw(){
   drawShapes(c,cam);
   if(S)glow(c,p.x-cam+4,p.y+6,18,rgba(elc(),.22));
   const ms=p.on&&Math.abs(p.vx)>0&&(G.t/6|0)%2?SPR.me2:SPR.me;
+  if(S&&S.squad&&!(p.inv>0&&G.t%6<3)){c.fillStyle=SQ[S.squad].col;const cx0=p.dir>0?p.x-cam-1:p.x-cam+6,wv=Math.abs(p.vx)>0?(G.t>>2)%2:0;c.fillRect(cx0,p.y+6,3,5+wv);c.fillRect(p.dir>0?cx0-1:cx0+3,p.y+9+wv,1,3)}
   if(!(p.inv>0&&G.t%6<3)){outline(c,ms,p.x-cam,p.y,1,p.dir<0);spr(c,ms,p.x-cam,p.y,{h:'#3a2f55',s:'#f1c27d',e:'#000',k:'#222',b:'#c9a54a'},S?elc():'#888',1,p.dir<0)}
   if(G.sh>0){c.strokeStyle='#4a8fd9';c.strokeRect(p.x-cam-2.5,p.y-2.5,13,17)}
   const px=p.x-cam;
@@ -382,8 +387,8 @@ function draw(){
   c.restore()
 }
 function finish(won){
-  G.running=0;if(G.story)return finishStory(won);if(G.awaken)return finishAwaken(won);const w=S.wave;
-  if(won){sfx('win');const xp=Math.round(20*Math.pow(1.22,w-1));G.msgs.unshift(`Victory! +${xp} XP for clearing the wave`);gainXP(xp);S.wave++;S.best=Math.max(S.best,S.wave)}
+  G.running=0;if(G.story)return finishStory(won);if(G.awaken)return finishAwaken(won);if(G.rival)return finishSpecial(won,'rival');if(G.dungeon)return finishSpecial(won,'dungeon');const w=S.wave;
+  if(won){sfx('win');const xp=Math.round(20*Math.pow(1.22,w-1));G.msgs.unshift(`Victory! +${xp} XP for clearing the wave`);gainXP(xp);addStars(1,G.msgs);S.wave++;S.best=Math.max(S.best,S.wave)}
   else{S.wave=Math.max(1,w-2);G.msgs.unshift(`Defeated… you retreat to wave ${S.wave}.`)}
   save();const m=G.msgs;startTown();G.p.x=24*T;
   app.innerHTML=`<h1>${won?'Wave cleared!':'Defeated'}</h1><div class="card">${m.map(x=>`<div>${x}</div>`).join('')}
@@ -568,7 +573,7 @@ function ambient(){const b=G.bio,px=G.p.x,Rn=Math.random;
   if(b.amb==='snow'&&G.t%2===0)G.parts.push({x:px-180+Rn()*380,y:-4,vx:-.2+(Rn()-.5)*.3,vy:.45+Rn()*.3,l:400,c:'#ffffff',s:Rn()<.3?2:1});
   if(b.amb==='cloud'&&G.t%14===0)G.parts.push({x:px+180,y:20+Rn()*140,vx:-1-Rn(),vy:0,l:400,c:'#c8d4ff',s:2})}
 function hazards(){const p=G.p,b=G.bio;shapesTick();
-  for(const q of G.pages)if(!q.got&&Math.abs(p.x+4-q.x)<10&&Math.abs(p.y+6-q.y)<14){q.got=1;sfx('pick');burst(q.x,q.y,'#fff3b0',14,1.5);say('Page found! ('+G.pages.filter(x=>x.got).length+'/3)')}
+  for(const q of G.pages)if(!q.got&&Math.abs(p.x+4-q.x)<10&&Math.abs(p.y+6-q.y)<14){q.got=1;sfx('pick');burst(q.x,q.y,'#fff3b0',14,1.5);say((q.chest?'Chest opened! ':'Page found! ')+'('+G.pages.filter(x=>x.got).length+'/3)');if(q.chest)chestLoot(q)}
   if(b.liq){const cx=Math.floor((p.x+4)/T),cy=Math.min(11,Math.floor((p.y+p.h)/T));
     if(G.grid[cx]&&G.grid[cx][cy]===2&&p.inv<=0){const L=b.liq==='lava';hitPlayer(Math.round(S.hpMax*(L?.12:.07)));p.vy=-7.5;p.inv=50;burst(p.x+4,p.y+12,L?'#ff8030':'#7dff7a',14,2);pop(p,L?'burned!':'poisoned!','#ffb020')}}
   if(b.haz==='wind'){const ph=G.t%300;if(ph===0&&G.t>0){G.windDir=Math.random()<.5?-1:1;say('Wind gust '+(G.windDir>0?'→':'←'))}
@@ -592,17 +597,19 @@ function story(){S.story=S.story||{r:0,s:0,shards:0};return S.story}
 function stageObj(st){return st.r>=5||st.s===3?'boss':['reach','pages','slay'][(st.s+st.r)%3]}
 function stageName(st){return st.r>=5?'The Hollow Citadel':REG[st.r].n+' '+['I','II','III','— Guardian'][st.s]}
 function storyLine(){const st=story();return st.done?'Story complete ✔':st.r>=5?'Objective: storm the Hollow Citadel':'Objective: '+stageName(st)+' · Shards '+st.shards+'/5'}
-function objDone(){if(!G.obj||G.obj==='reach'||G.obj==='boss')return true;if(G.obj==='pages')return G.pages.every(q=>q.got);return G.kills>=G.killGoal}
-function objLeft(){if(G.obj==='pages')return 'Find the lost pages: '+G.pages.filter(q=>q.got).length+'/3';if(G.obj==='slay')return 'Defeat enemies: '+Math.min(G.kills,G.killGoal)+'/'+G.killGoal;return 'Defeat the guardian!'}
+function objDone(){if(!G.obj||G.obj==='reach'||G.obj==='boss')return true;if(G.obj==='pages'||G.obj==='chests')return G.pages.every(q=>q.got);return G.kills>=G.killGoal}
+function objLeft(){if(G.obj==='pages'||G.obj==='chests')return (G.obj==='chests'?'Open the treasure chests: ':'Find the lost pages: ')+G.pages.filter(q=>q.got).length+'/3';if(G.obj==='slay')return 'Defeat enemies: '+Math.min(G.kills,G.killGoal)+'/'+G.killGoal;return 'Defeat the guardian!'}
 function startStory(){const st=story();startFight({w:st.r>=5?25:st.r*5+[1,2,4,5][st.s],story:{r:st.r,s:st.s},obj:stageObj(st),final:st.r>=5})}
 function screenPortal(){const st=story();
   app.innerHTML=`<h1>The Portal</h1><div class="card"><h2>Story: ${st.done?'Complete!':REG[Math.min(st.r,5)].n}</h2>${st.done?'<p>Archmage Veyl is defeated and the kingdom is safe. The Endless Trials still call.</p>':
   `<p class="mute">${REG[Math.min(st.r,5)].lore}</p><p>Stage ${st.r>=5?'FINAL':(st.s+1)+'/4'}: <b>${stageName(st)}</b>. Objective: ${OBJ_TXT[stageObj(st)]}.</p>
   <p>Seal Shards: <span style="color:#ffd700">${'◆'.repeat(st.shards)}</span>${'◇'.repeat(5-st.shards)}</p><button onclick="startStory()">Enter stage</button>`}</div>
   <div class="card"><h2>Endless Trials</h2><p class="mute">Wave ${S.wave} (best ${S.best}). Biomes rotate every 5 waves.</p><button onclick="startFight()">Enter wave ${S.wave}</button></div>
+  <div class="card"><h2>Dungeon</h2><p class="mute">The Forgotten Crypt: open 3 treasure chests full of materials, then escape. Scales to your level.</p><button onclick="startDungeon()">Enter the crypt</button></div>
+  <div class="card"><h2>Rival</h2><p class="mute">${rivalLine()}</p>${rivalReady()&&(S.rivalWins||0)<5?'<button onclick="startRival()">Duel '+RIVAL+'</button>':''}</div>
   <button onclick="app.innerHTML=''">Close</button>`}
 function finishStory(won){const st=story(),g=G,w=Math.max(1,Math.min(5,g.story.r)*5+3);
-  if(won){sfx('win');const xp=Math.round(25*Math.pow(1.22,w-1));g.msgs.unshift('Stage cleared! +'+xp+' XP');gainXP(xp);
+  if(won){sfx('win');const xp=Math.round(25*Math.pow(1.22,w-1));g.msgs.unshift('Stage cleared! +'+xp+' XP');gainXP(xp);addStars(g.story.s===3||g.story.r>=5?5:3,g.msgs);
     if(g.story.r>=5){st.done=1;g.msgs.unshift('<b style="color:#ffd700">ARCHMAGE VEYL FALLS!</b>');g.msgs.push(ENDING)}
     else if(st.s<3)st.s++;else{st.shards++;st.r++;st.s=0;g.msgs.unshift('<b style="color:#ffd700">Seal Shard obtained! ('+st.shards+'/5)</b>');g.msgs.push('<i>'+REG[st.r].lore+'</i>')}}
   else g.msgs.unshift('Defeated… the stage awaits your return. Story stages never push you back.');
@@ -718,6 +725,35 @@ function pactHtml(){if(!S)return '';if(!(S.lv>=12||story().shards>=2))return '<p
   <p><b>Dark Pact</b>: +30% spell damage, but a dark meter fills as you fight. From 40% press <b>T</b> to unleash a dark explosion around you. If it reaches 100%, the darkness takes over for 3 seconds: you charge at enemies with double melee damage, but take 50% more damage.</p>
   <button ${cur==='spirit'?'disabled':''} onclick="takePact('spirit')">Spirit Pact</button><button ${cur==='dark'?'disabled':''} onclick="takePact('dark')">Dark Pact</button><p id="perr" style="color:var(--bad)"></p></div>`}
 function takePact(k){if(S.pact){S.mats=S.mats||{};if((S.mats[SEAL]||0)<3){const e=$('perr');if(e)e.textContent='Switching pacts costs 3 Seal Fragments.';return}S.mats[SEAL]-=3}S.pact=k;sfx('boss');save();screenStart()}
+
+// ---------- PHASE 5: SQUADS, RANKS, RIVAL, DUNGEON ----------
+BIOMES.push({n:'Forgotten Crypt',sky:['#04060c','#0c1424','#1a2638','#2a3a50'],l:['#141c2c','#0e1420','#080c14'],k1:4,t:['#3a4250','#424a58','#2a303c','#58627a','#1a1e28','#3a4a4a','#4a5a5a','#7a8a8a'],brick:1,amb:'firefly',fc:'#a8d8ff',fog:'rgba(120,160,220,.06)',gap:.1,liq:'poison',moon:'#a8c8ff',roster:['ghost','knight','archer','mage','crawler','slime','bat','imp'],boss:0});
+const SQ={lions:{n:'Crimson Lions',col:'#d94a3a',d:'+15% damage while above half HP'},wardens:{n:'Azure Wardens',col:'#3a7ad9',d:'shields +25%, and you start every battle shielded'},
+  hearts:{n:'Verdant Hearts',col:'#3aa95a',d:'healing +30%, and you slowly regenerate HP'},gale:{n:'Gale Riders',col:'#e8d070',d:'+15% speed and one extra mid-air jump'}};
+const RANKS=[['Recruit',0],['Knight',10],['Senior Knight',25],['Captain',50],['Vice-Commander',90],['Grand Mage',150]];
+function rankIdx(){const s=(S&&S.stars)||0;let i=0;RANKS.forEach((r,j)=>{if(s>=r[1])i=j});return i}
+function addStars(n,msgs){const b=rankIdx();S.stars=(S.stars||0)+n;if(msgs)msgs.push('+'+n+' merit star'+(n>1?'s':'')+' ★');const a=rankIdx();if(a>b&&msgs)msgs.push('<b style="color:#ffd700">PROMOTED to '+RANKS[a][0]+'!</b> (+3% spell power)')}
+function screenHall(){const ri=rankIdx(),nx=RANKS[ri+1],st=S.stars||0;
+  app.innerHTML=`<h1>Knight Hall</h1><div class="card"><p>Rank: <b>${RANKS[ri][0]}</b> · ★ ${st}${nx?' · next: '+nx[0]+' at ★'+nx[1]:' · highest rank!'}</p>${nx?bar(st-RANKS[ri][1],nx[1]-RANKS[ri][1],'#ffd700'):''}
+  <p class="mute">Earn merit stars by clearing story stages (+3, guardians +5), endless waves (+1), dungeons (+4) and beating your rival (+5). Each rank adds +3% spell power.</p></div>
+  <div class="card"><b>Squads</b>${S.squad?' · you serve the <b style="color:'+SQ[S.squad].col+'">'+SQ[S.squad].n+'</b>':''}${S.lv<5?'<p class="mute">Squads accept mages from level 5.</p>':Object.entries(SQ).map(([k,q])=>`<div style="margin:4px 0"><b style="color:${q.col}">${q.n}</b> <span class="mute">${q.d}</span> ${S.squad===k?'<span class="tag">your squad</span>':`<button onclick="joinSquad('${k}')">${S.squad?'Transfer (2 Seal Fragments)':'Join'}</button>`}</div>`).join('')}<p id="herr" style="color:var(--bad)"></p></div>
+  <div class="card"><b>Rival</b><p class="mute">${rivalLine()}</p></div><button onclick="app.innerHTML=''">Close</button>`}
+function joinSquad(k){if(S.lv<5)return;if(S.squad){S.mats=S.mats||{};if((S.mats[SEAL]||0)<2){$('herr').textContent='Transferring costs 2 Seal Fragments.';return}S.mats[SEAL]-=2}S.squad=k;sfx('level');save();screenHall()}
+const RIVAL='Kael';
+function rivalReady(){return S.lv>=6+4*(S.rivalWins||0)}
+function rivalLine(){const w=S.rivalWins||0;return w>=5?RIVAL+' admits you are the stronger mage. (Rival beaten 5 times.)':rivalReady()?RIVAL+', a rival mage whose element counters yours, waits at the Portal. "Let\'s see if you\'ve grown."':RIVAL+' is training. They will challenge you again at level '+(6+4*w)+'.'}
+function startRival(){if(!rivalReady())return;startFight({w:6+(S.rivalWins||0)*5,obj:'boss',rival:1})}
+function startDungeon(){startFight({w:Math.max(3,Math.min(S.lv,30)),obj:'chests',dungeon:1})}
+function chestLoot(q){S.mats=S.mats||{};for(let i=0;i<3;i++){const k=MATS[Math.floor(Math.random()*5)];S.mats[k]=(S.mats[k]||0)+1;pop({x:q.x,y:q.y-10*i},'+1 '+k,'#9ad7ff')}
+  if(Math.random()<.3){S.mats[SEAL]=(S.mats[SEAL]||0)+1;pop({x:q.x,y:q.y-30},'+1 Seal Fragment','#ffd700')}
+  if(Math.random()<.4){const ik=Object.keys(ITEMS),it=ik[Math.floor(Math.random()*4)];S.inv[it]=(S.inv[it]||0)+1;G.msgs.push('Found: '+it)}}
+function finishSpecial(won,kind){const g=G,m=g.msgs;
+  if(won){sfx('win');if(kind==='rival'){S.rivalWins=(S.rivalWins||0)+1;gainXP(Math.round(40*Math.pow(1.15,S.lv)));
+      m.unshift('<b>'+RIVAL+' is defeated!</b> "'+['Not bad... I will be back.','You got lucky. Next time!','How are you this strong?','I... need to train harder.','You are the better mage. For now.'][Math.min(4,S.rivalWins-1)]+'"');
+      addStars(5,m);S.mats=S.mats||{};S.mats[SEAL]=(S.mats[SEAL]||0)+1;m.push('+1 Seal Fragment')}
+    else{m.unshift('<b>Dungeon cleared!</b>');addStars(4,m);gainXP(Math.round(30*Math.pow(1.12,S.lv)))}}
+  else m.unshift(kind==='rival'?RIVAL+': "Ha! Come back when you are stronger."':'You flee the crypt. Its treasure remains.');
+  save();startTown();G.p.x=24*T;app.innerHTML=`<h1>${won?'Victory!':'Defeated'}</h1><div class="card">${m.map(x=>`<div>${x}</div>`).join('')}<p>Lv ${S.lv} · ★ ${S.stars||0} (${RANKS[rankIdx()][0]})</p><button onclick="app.innerHTML=''">Back to town</button></div>`}
 if(S)S.inv=S.inv||{};
 startTown();
 </script></body></html>
