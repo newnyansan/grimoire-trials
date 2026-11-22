@@ -66,6 +66,23 @@ const sun=new THREE.DirectionalLight('#ffe6c8',2.6);sun.castShadow=true;sun.shad
 Object.assign(sun.shadow.camera,{left:-45,right:45,top:45,bottom:-45,near:1,far:320});sun.shadow.bias=-.0008;scene.add(sun,sun.target);
 let composer=null;addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(composer)composer.setSize(innerWidth,innerHeight)});
 const mat=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.85,flatShading:true},o||{}));
+const TEXC={};
+function texCanvas(kind){if(TEXC[kind])return TEXC[kind];const cv=document.createElement('canvas');cv.width=cv.height=128;const c=cv.getContext('2d'),R=Math.random;
+  if(kind==='brick'){c.fillStyle='#5a5462';c.fillRect(0,0,128,128);for(let y=0;y<128;y+=16)for(let x=(y/16%2)*16-16;x<128;x+=32){const v=130+R()*45|0;c.fillStyle='rgb('+v+','+(v-6)+','+(v+10)+')';c.fillRect(x+1,y+1,30,14);c.fillStyle='rgba(255,255,255,.08)';c.fillRect(x+1,y+1,30,2)}}
+  if(kind==='shingle'){c.fillStyle='#2a1d2e';c.fillRect(0,0,128,128);for(let y=0;y<128;y+=12)for(let x=(y/12%2)*10-10;x<128;x+=20){c.fillStyle='hsl('+(270+R()*25|0)+',22%,'+(20+R()*12|0)+'%)';c.fillRect(x+1,y+1,18,10);c.fillStyle='rgba(0,0,0,.3)';c.fillRect(x+1,y+9,18,2)}}
+  if(kind==='plaster'){c.fillStyle='#e2d6c0';c.fillRect(0,0,128,128);for(let i=0;i<500;i++){c.fillStyle='rgba(120,95,70,'+(R()*.14).toFixed(2)+')';c.fillRect(R()*128,R()*128,2+R()*3,2+R()*3)}}
+  if(kind==='wood'){c.fillStyle='#5a3a22';c.fillRect(0,0,128,128);for(let i=0;i<50;i++){c.fillStyle='rgba(25,12,4,'+(R()*.4).toFixed(2)+')';c.fillRect(0,R()*128,128,1+R()*2)}}
+  const tx=new THREE.CanvasTexture(cv);tx.wrapS=tx.wrapT=THREE.RepeatWrapping;tx.colorSpace=THREE.SRGBColorSpace;return TEXC[kind]=tx}
+function tmat(kind,rx,ry,col){const tx=texCanvas(kind).clone();tx.needsUpdate=true;tx.repeat.set(rx,ry);return new THREE.MeshStandardMaterial({map:tx,color:col||'#ffffff',roughness:.92})}
+function makeHouse(tint){const g=new THREE.Group(),sh=(m,x,y,z)=>{m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;g.add(m);return m},wood=tmat('wood',1,1);
+  sh(new THREE.Mesh(new THREE.BoxGeometry(5.3,.8,5.3),tmat('brick',3,.5)),0,.4,0);sh(new THREE.Mesh(new THREE.BoxGeometry(5,3.2,5),tmat('plaster',2,1.4,tint)),0,2.4,0);
+  for(const[x,z]of[[-2.5,-2.5],[2.5,-2.5],[-2.5,2.5],[2.5,2.5]])sh(new THREE.Mesh(new THREE.BoxGeometry(.34,3.3,.34),wood),x,2.45,z);
+  for(const s of[-1,1]){sh(new THREE.Mesh(new THREE.BoxGeometry(5.1,.28,.3),wood),0,2.5,s*2.52);sh(new THREE.Mesh(new THREE.BoxGeometry(.3,.28,5.1),wood),s*2.52,2.5,0);sh(new THREE.Mesh(new THREE.BoxGeometry(5.1,.3,.3),wood),0,3.95,s*2.52)}
+  const roof=sh(new THREE.Mesh(new THREE.ConeGeometry(4.7,3,4),tmat('shingle',3,2)),0,5.5,0);roof.rotation.y=Math.PI/4;
+  sh(new THREE.Mesh(new THREE.BoxGeometry(.7,2.2,.7),tmat('brick',1,2)),1.4,6,1.1);sh(new THREE.Mesh(new THREE.BoxGeometry(1.1,2,.14),wood),0,1.8,2.56);
+  const wm=new THREE.MeshBasicMaterial({color:'#ffcf6a'});for(const x of[-1.5,1.5]){const w=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),wm);w.position.set(x,2.9,2.58);g.add(w);
+    sh(new THREE.Mesh(new THREE.BoxGeometry(1,.12,.12),wood),x,2.45,2.6);sh(new THREE.Mesh(new THREE.BoxGeometry(.1,.9,.1),wood),x,2.9,2.61)}
+  return g}
 
 // ---------- world ----------
 const SIZE=600,HALF=300;
@@ -106,8 +123,7 @@ for(const s of ZONES){const y=H(s.x,s.z);s.base=new THREE.Group();scene.add(s.ba
   const L=new THREE.PointLight('#ffb060',80,s.r*2.6,1.6);L.position.set(s.x,y+4,s.z);s.base.add(L);s.light=L}
 const BLD=[['Grimoire Lectern','hub'],['Spell Forge','forge'],['Spell Sage','sage'],['Page Binding','pages'],['Knight Hall','hall'],['Trial Shrine','shrine']],HOUSES=[];
 for(let i=0;i<6;i++){const a=i/6*Math.PI*2+.3,x=Math.cos(a)*16,z=Math.sin(a)*16,y=H(x,z);
-  const house=new THREE.Mesh(new THREE.BoxGeometry(5,4,5),mat(['#6a4a58','#5a4a6a','#6a5a4a'][i%3]));house.position.set(x,y+2,z);house.rotation.y=-a;house.castShadow=house.receiveShadow=true;scene.add(house);
-  const roof=new THREE.Mesh(new THREE.ConeGeometry(4.3,3,4),mat('#2a1d3a'));roof.position.set(x,y+5.5,z);roof.rotation.y=-a+Math.PI/4;roof.castShadow=true;scene.add(roof);addObst(x,z,3.4);HOUSES.push({x,z,n:BLD[i][0],menu:BLD[i][1]});scene.add(sign(BLD[i][0],x,y+8.4,z))}
+  const hg=makeHouse(['#efe0cc','#e0d8ef','#efe8cc'][i%3]);hg.position.set(x,y,z);hg.rotation.y=Math.atan2(-Math.cos(a),-Math.sin(a));scene.add(hg);addObst(x,z,3.4);HOUSES.push({x,z,n:BLD[i][0],menu:BLD[i][1]});scene.add(sign(BLD[i][0],x,y+8.4,z))}
 const zoneAt=(x,z)=>ZONES.find(s=>s.rev!==false&&Math.hypot(x-s.x,z-s.z)<s.r);
 
 // ---------- character models ----------
@@ -169,10 +185,15 @@ function addVillager(cx,cz,role,i){const VR=MODELS.knight?rig('knight',1.2,['#ff
 ['patrol','worker','sit','train'].forEach((r,i)=>addVillager(0,0,r,i));
 {const dg=new THREE.Group(),dx=5,dz=-9.5,y=H(dx,dz);part(dg,new THREE.CylinderGeometry(.15,.15,2.4,6),mat('#6a4a2a'),0,1.2,0);part(dg,new THREE.BoxGeometry(1.6,.2,.2),mat('#6a4a2a'),0,1.7,0);
  part(dg,new THREE.SphereGeometry(.4,8,6),mat('#c8a860'),0,2.5,0);part(dg,new THREE.CylinderGeometry(.45,.4,.9,8),mat('#c8a860'),0,1.6,0);dg.position.set(dx,y,dz);scene.add(dg);addObst(dx,dz,.6)}
-function villTick(dt){for(const v of villagers){let anim='Idle',to=null;const vz=ZONES.find(z=>z.x===v.cx&&z.z===v.cz)||{r:20},th=enemies.find(e=>Math.hypot(e.x-v.cx,e.z-v.cz)<vz.r+10);
-  if(th){const a=Math.atan2(th.z-v.cz,th.x-v.cx)+(v.i%3-1)*.25,px=v.cx+Math.cos(a)*(vz.r-1.6),pz=v.cz+Math.sin(a)*(vz.r-1.6),dx=px-v.x,dz=pz-v.z,d=Math.hypot(dx,dz);
-    if(d>.5){const st=Math.min(d,4.2*dt);v.x+=dx/d*st;v.z+=dz/d*st;collide(v,.5);v.face=Math.atan2(dx,dz);anim='Running_A'}
-    else{v.face=Math.atan2(th.x-v.x,th.z-v.z);anim='1H_Melee_Attack_Chop';v.atk=(v.atk||0)-dt;if(v.atk<=0&&Math.hypot(th.x-v.x,th.z-v.z)<th.r+4.5){v.atk=1;hurt(th,4+S.lv)}}
+function villTick(dt){for(const v of villagers){let anim='Idle',to=null;const vz=ZONES.find(z=>z.x===v.cx&&z.z===v.cz)||{r:20},th=enemies.find(e=>Math.hypot(e.x-v.cx,e.z-v.cz)<vz.r+12),R0=vz.r-.5,walled=!!(vz.gates&&vz.gates.length);
+  const inside=(x,z)=>Math.hypot(x-v.cx,z-v.cz)<R0,amIn=inside(v.x,v.z);
+  const via=(x0,z0)=>{if(!walled||amIn===inside(x0,z0))return[x0,z0];const ta=Math.atan2(z0-v.cz,x0-v.cx),ad=(p,q)=>Math.abs(((p-q+Math.PI*3)%(Math.PI*2))-Math.PI),g=vz.gates.reduce((b,x)=>ad(x.a,ta)<ad(b.a,ta)?x:b);
+    const ip=[v.cx+Math.cos(g.a)*(R0-2.4),v.cz+Math.sin(g.a)*(R0-2.4)],op=[v.cx+Math.cos(g.a)*(R0+2.4),v.cz+Math.sin(g.a)*(R0+2.4)],nr=amIn?ip:op;return Math.hypot(v.x-nr[0],v.z-nr[1])<1.4?(amIn?op:ip):nr};
+  let dest=null,fight=null;
+  if(th){fight=th;const dd=Math.hypot(th.x-v.x,th.z-v.z)||1;dest=[th.x-(th.x-v.x)/dd*(th.r+1.3),th.z-(th.z-v.z)/dd*(th.r+1.3)]}else if(walled&&!amIn)dest=[v.cx+Math.cos(v.a)*5,v.cz+Math.sin(v.a)*5];
+  if(dest){const tg=via(dest[0],dest[1]),dx=tg[0]-v.x,dz=tg[1]-v.z,d=Math.hypot(dx,dz);
+    if(fight&&Math.hypot(fight.x-v.x,fight.z-v.z)<fight.r+2.2){v.face=Math.atan2(fight.x-v.x,fight.z-v.z);anim='1H_Melee_Attack_Chop';v.atk=(v.atk||0)-dt;if(v.atk<=0){v.atk=1;hurt(fight,4+S.lv)}}
+    else if(d>.3){const st=Math.min(d,4.4*dt);v.x+=dx/d*st;v.z+=dz/d*st;collide(v,.5);v.face=Math.atan2(dx,dz);anim='Running_A'}
     if(v.R){play(v.R,anim);v.R.mixer.update(dt)}else{v.ph+=dt*9;animWalk(v,v.ph,.6)}v.g.position.set(v.x,H(v.x,v.z),v.z);v.g.rotation.y+=(((v.face-v.g.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*8);continue}
   if(v.role==='patrol'){const z=ZONES.find(z=>z.x===v.cx&&z.z===v.cz),zr=z?z.r:20;v.a+=dt*.1;to=[v.cx+Math.cos(v.a)*(zr-3),v.cz+Math.sin(v.a)*(zr-3)]}
   else if(v.role==='sit')to=[v.cx+Math.cos(2.4+v.i)*3.3,v.cz+Math.sin(2.4+v.i)*3.3];
@@ -260,13 +281,17 @@ function buildTown(i){const z=ZONES[i],lv=TW[i].lv;if(z.grp)z.base.remove(z.grp)
   const add=(m,x,zz,r)=>{m.position.x+=z.x+x;m.position.z+=z.z+zz;m.position.y+=H(z.x+x,z.z+zz);m.castShadow=m.receiveShadow=true;g.add(m);if(r)z.obs.push({x:z.x+x,z:z.z+zz,r})};
   if(i!==0){if(lv===0)for(let k=0;k<3;k++){const a=k/3*6.283+.5,tn=new THREE.Mesh(new THREE.ConeGeometry(1.8,2.6,6),mat(['#a0603a','#6a7a3a','#7a4a6a'][k]));tn.position.y=1.3;add(tn,Math.cos(a)*6,Math.sin(a)*6,1.8)}
     else{const nh=[0,4,6,8][lv],rad=[0,9,12,15][lv];for(let k=0;k<nh;k++){const a=k/nh*6.283+.4,hx=Math.cos(a)*rad,hz=Math.sin(a)*rad;
-      const h=new THREE.Mesh(new THREE.BoxGeometry(4,3.4,4),mat(['#6a4a58','#5a4a6a','#6a5a4a','#4a5a6a'][k%4]));h.position.y=1.7;h.rotation.y=-a;add(h,hx,hz,2.9);
-      const rf=new THREE.Mesh(new THREE.ConeGeometry(3.5,2.6,4),mat('#3a2a3a'));rf.position.y=4.7;rf.rotation.y=-a+.785;add(rf,hx,hz);
-      const w=new THREE.Mesh(new THREE.PlaneGeometry(.9,.9),new THREE.MeshBasicMaterial({color:'#ffcf6a'}));w.position.y=1.9;w.position.x=-Math.cos(a)*2.02;w.position.z=-Math.sin(a)*2.02;w.rotation.y=-a-Math.PI/2;add(w,hx,hz)}}}
-  if(lv>=2){const Rr=z.r-.5,segs=28;for(let k=0;k<segs;k++){if(k%7===0)continue;const a=(k+.5)/segs*6.283,w=new THREE.Mesh(new THREE.BoxGeometry(2*Math.PI*Rr/segs+.25,2.6,.9),mat('#7a7480'));w.position.y=1.3;w.rotation.y=-a+Math.PI/2;add(w,Math.cos(a)*Rr,Math.sin(a)*Rr)}
-    for(let k=0;k<4;k++){const a=k/4*6.283+.45,tx=Math.cos(a)*Rr,tz=Math.sin(a)*Rr,tw=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.6,6.5,8),mat('#6a6470'));tw.position.y=3.25;add(tw,tx,tz,1.5);
-      const cp=new THREE.Mesh(new THREE.ConeGeometry(1.9,2.2,8),mat('#3a2a5a'));cp.position.y=7.6;add(cp,tx,tz);if(k===0)z.tower={x:z.x+tx,z:z.z+tz}}}
-  if(lv>=3){const kp=new THREE.Mesh(new THREE.BoxGeometry(7,8,7),mat('#8a8494'));kp.position.y=4;add(kp,0,8,4.6);
+      const hg=makeHouse(['#efe0cc','#e0d8ef','#efe8cc','#dfe8ef'][k%4]);hg.scale.setScalar(.85);hg.rotation.y=Math.atan2(-Math.cos(a),-Math.sin(a));add(hg,hx,hz,2.9)}}}
+  if(lv>=2){const Rr=z.r-.5,segs=28,bm=tmat('brick',2,1),gates=[];for(let k=0;k<segs;k++){const a=(k+.5)/segs*6.283,cx=Math.cos(a)*Rr,cz=Math.sin(a)*Rr;
+      if(k%7===0){gates.push({a});for(const s of[-1,1]){const pa=a+s*(.5/segs)*6.283,pl=new THREE.Mesh(new THREE.BoxGeometry(1.4,4.6,1.4),bm);pl.position.y=2.3;add(pl,Math.cos(pa)*Rr,Math.sin(pa)*Rr,1)}
+        const lt=new THREE.Mesh(new THREE.BoxGeometry(2*Math.PI*Rr/segs+1.4,.9,1.3),bm);lt.position.y=4.6;lt.rotation.y=-a+Math.PI/2;add(lt,cx,cz);continue}
+      const L=2*Math.PI*Rr/segs+.25,w=new THREE.Mesh(new THREE.BoxGeometry(L,3,1),bm);w.position.y=1.5;w.rotation.y=-a+Math.PI/2;add(w,cx,cz);
+      for(let m=0;m<3;m++){const ma=a+(m-1)/3*6.283/segs,mr=new THREE.Mesh(new THREE.BoxGeometry(.8,.7,1.1),bm);mr.position.y=3.35;mr.rotation.y=-a+Math.PI/2;add(mr,Math.cos(ma)*Rr,Math.sin(ma)*Rr);z.obs.push({x:z.x+Math.cos(ma)*Rr,z:z.z+Math.sin(ma)*Rr,r:1})}}
+    z.gates=gates;
+    for(let k=0;k<4;k++){const a=k/4*6.283+.45,tx=Math.cos(a)*Rr,tz=Math.sin(a)*Rr,tw=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.7,7,12),tmat('brick',3,2));tw.position.y=3.5;add(tw,tx,tz,1.7);
+      for(let m=0;m<6;m++){const ma=m/6*6.283,mr=new THREE.Mesh(new THREE.BoxGeometry(.6,.6,.6),bm);mr.position.set(Math.cos(ma)*1.3,7.3,Math.sin(ma)*1.3);add(mr,tx,tz)}
+      const cp=new THREE.Mesh(new THREE.ConeGeometry(1.9,2.4,12),tmat('shingle',2,1));cp.position.y=8.8;add(cp,tx,tz);if(k===0)z.tower={x:z.x+tx,z:z.z+tz}}}
+  if(lv>=3){const kp=new THREE.Mesh(new THREE.BoxGeometry(7,8,7),tmat('brick',4,4));kp.position.y=4;add(kp,0,8,4.6);
     for(const[dx,dz]of[[-3.5,4.5],[3.5,4.5],[-3.5,11.5],[3.5,11.5]]){const tt=new THREE.Mesh(new THREE.CylinderGeometry(1,1.1,10,8),mat('#7a7484'));tt.position.y=5;add(tt,dx,dz);const cc=new THREE.Mesh(new THREE.ConeGeometry(1.5,2.4,8),mat('#5a2a3a'));cc.position.y=11.2;add(cc,dx,dz)}
     const fl=new THREE.Mesh(new THREE.PlaneGeometry(2.2,1.3),new THREE.MeshStandardMaterial({color:ECOL,side:THREE.DoubleSide,emissive:ECOL,emissiveIntensity:.3}));fl.position.set(1.1,13.4,0);add(fl,0,8);
     const pole=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,4,6),mat('#ddd'));pole.position.y=12;add(pole,0,8)}
@@ -274,7 +299,7 @@ function buildTown(i){const z=ZONES[i],lv=TW[i].lv;if(z.grp)z.base.remove(z.grp)
 function xpBonus(e){return ZONES.some((z,i)=>z.rev&&TW[i].lv>=3&&biome(z.x,z.z)===biome(e.x,e.z))?1.1:1}
 function towersTick(dt){ZONES.forEach((z,i)=>{if(!z.rev||TW[i].lv<3||!z.tower)return;z.tcd=(z.tcd||0)-dt;if(z.tcd>0)return;const e=enemies.find(e=>Math.hypot(e.x-z.x,e.z-z.z)<z.r+16);if(!e)return;z.tcd=1.2;
   const from=new THREE.Vector3(z.tower.x,H(z.tower.x,z.tower.z)+8,z.tower.z),dir=new THREE.Vector3(e.x-from.x,e.y+e.cy-from.y,e.z-from.z).normalize();shoot(from,dir,45,.45,'#ffd27a',false,{dmg:10+S.lv*3,fx:[],dot:false})})}
-function closePanel(){const d=$('tpanel');if(d)d.remove();menuOpen=false}
+function closePanel(re){const d=$('tpanel');if(d)d.remove();menuOpen=false;if(re===true)relock()}
 function openTown(i){closePanel();menuOpen=true;document.exitPointerLock();for(const k in keys)keys[k]=0;const z=ZONES[i],lv=TW[i].lv,c=COST[lv+1],m=ZMAT(i),have=S.mats[m]||0,gold=S.gold||0,seal=S.mats['Seal Fragment']||0;
   const can=!!c&&gold>=c.gold&&have>=c.mat&&seal>=(c.seal||0);
   const others=ZONES.map((o,j)=>j!==i&&o.rev&&(TW[j].lv>=1||j===0)?'<button onclick="__town.travel('+j+')">'+o.n+'</button> ':'').join('');
@@ -286,7 +311,7 @@ function openTown(i){closePanel();menuOpen=true;document.exitPointerLock();for(c
 window.__town={upgrade(i){const lv=TW[i].lv,c=COST[lv+1],m=ZMAT(i);if(!c||(S.gold||0)<c.gold||(S.mats[m]||0)<c.mat||(S.mats['Seal Fragment']||0)<(c.seal||0))return;
     S.gold-=c.gold;S.mats[m]-=c.mat;if(c.seal)S.mats['Seal Fragment']-=c.seal;const before=ZONES.map(z=>z.rev);TW[i].lv++;applyTowns();persist();
     const nr=ZONES.findIndex((z,j)=>z.rev&&!before[j]);banner(ZONES[i].n+'!'+(nr>=0?' New region revealed: '+ZONES[nr].n:''));ring(ZONES[i].x,ZONES[i].z,ZONES[i].r,'#ffd27a');openTown(i)},
-  travel(j){closePanel();P.x=ZONES[j].x+5;P.z=ZONES[j].z+5;P.vy=0;P.y=H(P.x,P.z);banner('Travelled to '+ZONES[j].n)},hall(){closePanel();openMenu('hub')},close:closePanel};
+  travel(j){closePanel(true);P.x=ZONES[j].x+5;P.z=ZONES[j].z+5;P.vy=0;P.y=H(P.x,P.z);banner('Travelled to '+ZONES[j].n)},hall(){closePanel();openMenu('hub')},close:()=>closePanel(true)};
 // ---------- town buildings & menus ----------
 let nearHouse=null,nearCamp=null,menuOpen=false;
 function sign(t,x,y,z){const cv=document.createElement('canvas');cv.width=256;cv.height=56;const c=cv.getContext('2d');c.fillStyle='rgba(20,16,32,.88)';c.fillRect(0,0,256,56);c.strokeStyle='#c9a54a';c.lineWidth=4;c.strokeRect(2,2,252,52);
@@ -294,7 +319,8 @@ function sign(t,x,y,z){const cv=document.createElement('canvas');cv.width=256;cv
 function openMenu(m){if(!HAS_SAVE){banner('Take the Trial in the 2D game first');return}persist();menuOpen=true;document.exitPointerLock();for(const k in keys)keys[k]=0;
   const f=document.createElement('iframe');f.id='menu2d';f.src='./?menu='+m+'&embed=1&v='+Date.now();f.style.cssText='position:fixed;left:4%;top:4%;width:92%;height:92%;border:2px solid #c9a54a;border-radius:12px;z-index:20;background:#14121c';document.body.appendChild(f)}
 addEventListener('message',ev=>{if(ev.data!=='g3d-close')return;const f=$('menu2d');if(f)f.remove();try{const n=JSON.parse(localStorage.getItem('grimoire'));if(n&&n.g){S=n;S.mats=S.mats||{};S.stars=S.stars||0}}catch(e){}
-  SP=equipped();CD.length=0;SP.forEach(()=>CD.push(0));buildHud();P.hpMax=S.hpMax;P.mpMax=S.mpMax;P.hp=Math.min(P.hp,P.hpMax);menuOpen=false;banner('Grimoire updated')});
+  SP=equipped();CD.length=0;SP.forEach(()=>CD.push(0));buildHud();P.hpMax=S.hpMax;P.mpMax=S.mpMax;P.hp=Math.min(P.hp,P.hpMax);menuOpen=false;banner('Grimoire updated');relock()});
+function relock(){try{const p=renderer.domElement.requestPointerLock();if(p&&p.catch)p.catch(()=>{})}catch(e){}setTimeout(()=>{if(!locked)banner('Click the screen to control the camera')},400)}
 // ---------- effects ----------
 const projs=[],parts=[],nums=[],rings=[],beams=[];const sphereG=new THREE.SphereGeometry(1,10,8),boxG=new THREE.BoxGeometry(.3,.3,.3);
 function shoot(from,dir,speed,r,col,enemy,info,life){const m=new THREE.Mesh(sphereG,new THREE.MeshBasicMaterial({color:col}));m.scale.setScalar(r);m.position.copy(from);scene.add(m);
