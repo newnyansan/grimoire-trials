@@ -15,4 +15,4 @@ A 2D pixel-art magic platformer that runs in the browser.
 Or download and open `index.html` locally.
 No install needed. Progress saves in your browser.
 
-**Controls:** ←/→ or A/D move · Space/W/↑ jump · 1–8 cast spells · Esc retreat
+**Controls:** A/D move · W/Space jump · Q E R F skills · Left click/J basic attack · Shift dash · hold Right click/K to overcharge · Tab swap build · E use buildings in town · P/Esc pause · M mute
