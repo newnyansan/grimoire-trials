@@ -88,16 +88,16 @@ function screenReveal(){
 }
 function spellList(sp){return sp.map(s=>`<div>• <b>${s.name}</b> <span class="mute">${desc(s)}</span></div>`).join('')}
 function desc(s){let t={dmg:`deals ${s.power}`,heal:`heals ${s.power}`,shield:`blocks ${s.power}`,dot:`${s.power}/sec for 3s`}[s.kind];
-  t+=` · ${s.cost} MP`;if(s.cd)t+=` · ${s.cd}s cooldown`;if(s.recoil)t+=` · ${s.recoil} self-damage`;if(s.exhaust)t+=' · no mana regen for 3s';return t}
+  t+=` · ${s.cost} MP`;if(s.cd)t+=` · ${s.cd}s cooldown`;if(s.recoil)t+=` · ${s.recoil} self-damage`;if(s.exhaust)t+=' · no mana regen for 3s';if(s.fx&&s.fx.length)t+=' · '+s.fx.join(', ');return t}
 function screenHub(){
   const g=S.g,need=xpNeed();
   app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><h2 class="r${g.rarity}">${g.name} <span class="mute">(${RARITY[g.rarity]})</span></h2>
   <p>Level ${S.lv} · XP ${S.xp}/${need} · HP ${S.hpMax} · Mana ${S.mpMax} · Best wave ${S.best}</p>${bar(S.xp,need,'var(--acc)')}
   ${spellList(g.spells)}<p><b>Techniques</b> <span class="mute">(unlock by leveling)</span></p>${TECH.map(t=>`<div class="${S.lv>=t[1]?"":"mute"}">${S.lv>=t[1]?"✔":"🔒 Lv "+t[1]} <b>${t[0]}</b> — ${t[2]}</div>`).join("")}<p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
   <button onclick="startFight()">Fight wave ${S.wave}</button>
-  <button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
+  <button onclick="screenLoadout()">Loadout (${(S.load||[]).length||Math.min(5,g.spells.length)}/5)</button><button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
   <button onclick="if(confirm('Abandon this grimoire and retake the trial?')){localStorage.removeItem('grimoire');S=null;app.innerHTML=''}">New grimoire</button><button onclick="app.innerHTML=''">Close</button></p>
-  <p class="mute">Walk to the Spell Forge or Wave Portal in town to use them. You earn 1 Forge point every 3 levels. Enemies grow ~18% stronger every wave. Every 5th wave has a boss.</p></div>`;
+  <p class="mute">Walk to the Spell Forge or Wave Portal in town to use them. You earn 1 Forge point every 3 levels, and your grimoire grants a new spell every 2 levels. Visit the Spell Sage in town to design spells by describing them. Enemies grow ~18% stronger every wave. Every 5th wave has a boss.</p></div>`;
 }
 const xpNeed=()=>Math.round(40*Math.pow(1.35,S.lv-1));
 
@@ -113,8 +113,8 @@ function screenForge(){
   <p id="fprev" class="card"></p><p id="ferr" style="color:var(--bad)"></p>
   <button onclick="forge()">Forge spell</button><button onclick="screenHub()">Back</button></div>`;prev();
 }
-function forgeSpell(){
-  const k=$('fk').value,c=$('fc').value,t=+$('fp').value+(c==='Star Dust'?2:0),d=$('fd').value,m=S.g.mult,h=c==='Ancient Rune'?.5:1;
+function forgeSpell(){return buildSpell($('fk').value,+$('fp').value+($('fc').value==='Star Dust'?2:0),$('fd').value,$('fc').value)}
+function buildSpell(k,t,d,c){const m=S.g.mult,h=c==='Ancient Rune'?.5:1;
   const s={name:'',kind:k,power:Math.round({dmg:12,heal:12,shield:12,dot:5}[k]*t*0.75*m+8),cost:4+t*4,cd:1,recoil:0,cur:0};
   if(c==='Ember Core')s.power=Math.round(s.power*1.2);
   if(d==='recoil')s.recoil=Math.round(t*3.5*h);if(d==='cd')s.cd=1+Math.ceil((1+t/2)*h);
@@ -126,8 +126,8 @@ function forge(){
   const n=$('fn').value.trim().replace(/\s+/g,' ');
   if(!/^[A-Za-z ]{3,24}$/.test(n))return $('ferr').textContent='Name must be 3–24 letters.';
   if(BANNED.test(n))return $('ferr').textContent='Please choose a family-friendly name.';
-  if(!S.forgePts)return $('ferr').textContent='You need a Forge point (earned every 3 levels).';if(S.g.spells.length>=8)return $('ferr').textContent='Your grimoire is full (8 spells).';
-  const s=forgeSpell(),c=$('fc').value;s.name=n;if(c)S.inv[c]--;S.g.spells.push(s);S.forgePts--;save();screenHub();
+  if(!S.forgePts)return $('ferr').textContent='You need a Forge point (earned every 3 levels).';if(S.g.spells.length>=16)return $('ferr').textContent='Your grimoire is full (16 spells).';
+  const s=forgeSpell(),c=$('fc').value;s.name=n;if(c)S.inv[c]--;S.g.spells.push(s);S.forgePts--;fixLoad();if(S.load.length<5)S.load.push(S.g.spells.length-1);save();screenHub();
 }
 
 // ---------- COMBAT (2D pixel platformer) ----------
@@ -141,7 +141,7 @@ const SPR={me:["..hhhh..",".hhhhhh.","hhhbhhhh","..ssss..","..eses..","..ssss.."
  blob:["..oooo..",".oooooo.","owwoowwo","obwoobwo","oooooooo","oooooooo",".o.oo.o.","o..oo..o"]};
 function spr(c,a,x,y,map,col,s,flip){for(let r=0;r<a.length;r++)for(let q=0;q<8;q++){const ch=a[r][flip?7-q:q];if(ch!=='.'){c.fillStyle=map[ch]||col;c.fillRect(Math.round(x+q*s),Math.round(y+r*s),s,s)}}}
 const T=16,W=320,H=180,keys={};let G=null;
-addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;const k=e.key.toLowerCase();keys[k]=1;if(!G)return;
+addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase();keys[k]=1;if(!G)return;
   if([' ','arrowup','arrowdown'].includes(k))e.preventDefault();
   if(G.mode==='fight'){const n=e.code.startsWith('Digit')?+e.code.slice(5):0;if(n>=1&&n<=8&&!e.repeat)G.chg={i:n-1,t:performance.now()};
     if(k==='escape')leave();if(k==='f'||k==='j')melee();if(k==='q'&&has('Mana Armor')){G.armor=!G.armor;say('Mana Armor '+(G.armor?'ON':'off'))}
@@ -150,7 +150,7 @@ addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;const k=e.ke
 document.querySelectorAll('#touch [data-k]').forEach(b=>{const k=b.dataset.k;b.onpointerdown=()=>keys[k]=1;b.onpointerup=b.onpointerleave=()=>keys[k]=0});
 const busy=()=>app.childElementCount>0;
 const STATIONS=[{x:4,name:'Trial Shrine',go:()=>screenStart()},{x:11,name:'Grimoire Lectern',need:1,go:()=>screenHub()},
-  {x:18,name:'Spell Forge',need:1,go:()=>screenForge()},{x:26,name:'Wave Portal',need:1,go:()=>startFight()}];
+  {x:18,name:'Spell Forge',need:1,go:()=>screenForge()},{x:22,name:'Spell Sage',need:1,go:()=>screenSage()},{x:26,name:'Wave Portal',need:1,go:()=>startFight()}];
 function nearStation(){return G&&G.mode==='town'&&STATIONS.find(s=>Math.abs(G.p.x+4-(s.x*T+8))<20)}
 function interact(){if(busy())return;const s=nearStation();if(!s)return;if(s.need&&!S)return say('Take the Trial at the shrine first!');s.go()}
 function startTown(){
@@ -165,6 +165,7 @@ function drawStation(c,s,x,y,t){const ec=S?elc():'#c9a54a';
   if(s.x===4){c.fillStyle='#8a8aa0';c.fillRect(x-6,y-30,4,30);c.fillRect(x+18,y-30,4,30);c.fillRect(x-8,y-34,32,4);c.fillStyle=t%40<20?'#e0d0ff':'#b090ff';c.fillRect(x+4,y-20,8,8)}
   if(s.x===11){c.fillStyle='#6b4a2b';c.fillRect(x+6,y-14,4,14);c.fillRect(x,y-18,16,4);c.fillStyle=ec;c.fillRect(x+2,y-22,12,4)}
   if(s.x===18){c.fillStyle='#333';c.fillRect(x-2,y-10,20,4);c.fillRect(x+4,y-6,8,6);c.fillStyle=['#ff6a3d','#ffb020','#ffe14d'][Math.floor(t/8)%3];c.fillRect(x+20,y-8-(t%16<8?2:0),6,8)}
+  if(s.x===22){spr(c,SPR.me,x+4,y-12,{h:'#ddd',s:'#f1c27d',e:'#000',k:'#222',b:'#fff'},'#556',1,false);c.fillStyle='#ffd700';c.font='8px monospace';if(t%60<40)c.fillText('?',x+14,y-16)}
   if(s.x===26){for(let a=0;a<24;a++){const r=a/24*6.283+t/30;c.fillStyle=a%2?'#a070ff':'#5a3aa0';c.fillRect(x+6+Math.cos(r)*10,y-18+Math.sin(r)*16,3,3)}}
   c.font='8px monospace';c.textAlign='center';c.fillStyle='#ece8f5';c.fillText(s.name,x+8,y-40);c.textAlign='left'}
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0;if(e.key==='Shift')keys.shift=0;
@@ -186,18 +187,18 @@ function startFight(){
   if(boss)spawn(cols-9,true);
   en.forEach(e=>e.hpMax=e.hp);
   const fc=cols-3;
-  G={mode:'fight',field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
+  G={mode:'fight',sp:(fixLoad(),S.load.map(i=>S.g.spells[i])),field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
      msgs:[],banner:'',bT:0,flagX:fc*T,flagY:grid[fc].indexOf(1)*T,lastSafe:24,t:0,acc:0,last:performance.now(),running:1};
-  S.g.spells.forEach(s=>s.cur=0);
+  G.sp.forEach(s=>s.cur=0);
   app.innerHTML='';$('ttl').textContent=`Wave ${w}${boss?' — BOSS':''}`;
-  $('hud').innerHTML=`<div id="hs"></div>${S.g.spells.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${i+1}] ${s.name}<br><span class="mute">${desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;
+  $('hud').innerHTML=`<div id="hs"></div>${G.sp.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${i+1}] ${s.name}<br><span class="mute">${desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;
   $('help').innerHTML=`Move ←/→ or A/D · Jump Space/W/↑ · Cast with number keys (hold 0.6s to overcharge) · F melee · Shift enhance · Q armor · R field (as you unlock them) · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · Esc retreats.
   Letters above enemies = traits: ${Object.entries(TRAITS).map(([k,v])=>`<b>${k[0].toUpperCase()}</b> ${v}`).join(' · ')}`;
   G.c=$('cv').getContext('2d');updHud();const g=G;requestAnimationFrame(t=>loop(t,g));
 }
 function updHud(){if(G.mode==='town'){$('hs').innerHTML=S?`<b class="r${S.g.rarity}">${S.g.name}</b> · Lv ${S.lv} · XP ${S.xp}/${xpNeed()} · Next: wave ${S.wave}${S.forgePts?' · '+S.forgePts+' Forge pt':''}${bar(S.xp,xpNeed(),'var(--acc)')}`:'No grimoire yet.';return}
   $('hs').innerHTML=`HP ${Math.max(0,Math.ceil(G.hp))}/${S.hpMax}${bar(G.hp,S.hpMax,'var(--good)')}Mana ${Math.floor(G.mp)}/${S.mpMax}${bar(G.mp,S.mpMax,'var(--mana)')}XP ${S.xp}/${xpNeed()} · Lv ${S.lv}${bar(S.xp,xpNeed(),'var(--acc)')}${G.sh?'🛡️ Shield '+G.sh:''}${techLine()}`;
-  const ovf=overflow();S.g.spells.forEach((s,i)=>{const b=$('sb'+i);if(b)b.disabled=(!ovf&&G.mp<costOf(s))||s.cur>0})}
+  const ovf=overflow();G.sp.forEach((s,i)=>{const b=$('sb'+i);if(b)b.disabled=(!ovf&&G.mp<costOf(s))||s.cur>0})}
 function loop(now,g){if(G!==g||!g.running)return;g.acc+=Math.min(100,now-g.last);g.last=now;
   while(g.acc>=16.67&&G===g&&g.running){step();g.acc-=16.67}if(G!==g||!g.running)return;draw();if(g.t%8===0)updHud();requestAnimationFrame(t=>loop(t,g))}
 const pop=(o,t,c)=>G.pops.push({x:o.x,y:o.y,t,c,l:50});
@@ -208,7 +209,7 @@ function move(o){let bx=0;o.x+=o.vx;if(box(o)){o.x=o.vx>0?Math.floor((o.x+o.w)/T
   if(box(o)){if(o.vy>0){o.y=Math.floor((o.y+o.h)/T)*T-o.h;o.on=1}else o.y=Math.floor(o.y/T+1)*T;o.vy=0}return bx}
 const ov=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 function gainXP(x){S.xp+=x;while(S.xp>=xpNeed()){S.xp-=xpNeed();S.lv++;S.hpMax+=12;S.mpMax+=6;if(G)G.hp+=12;S.g.spells.forEach(s=>s.power=Math.round(s.power*1.06));
-  say('Level up! Lv '+S.lv);TECH.filter(t=>t[1]===S.lv).forEach(t=>say('New technique: '+t[0]+'!'));if(S.lv%3===0){S.forgePts++;say('+1 Forge point!')}}}
+  say('Level up! Lv '+S.lv);TECH.filter(t=>t[1]===S.lv).forEach(t=>say('New technique: '+t[0]+'!'));if(S.lv%2===0)grantSpell();if(S.lv%3===0){S.forgePts++;say('+1 Forge point!')}}}
 function say(m){if(G){G.msgs.push(m);G.banner=m;G.bT=120}}
 function hurt(e,d){if(e.dead)return;if(e.tr.includes('armored'))d=Math.round(d*.7);e.hp-=d;pop(e,'-'+d,'#fff');
   if(e.hp<=0){e.dead=1;gainXP(Math.round((e.boss?30:4)*G.sc));const ik=Object.keys(ITEMS),n=e.boss?2:Math.random()<.25?1:0;
@@ -220,11 +221,11 @@ const TECH=[['Weapon Infusion',1,'F: free melee swing charged with your element'
 const has=n=>!!S&&S.lv>=TECH.find(t=>t[0]===n)[1];
 const overflow=()=>has('Mana Overflow')&&G.hp<S.hpMax*.2;
 const costOf=(s,o)=>Math.round(s.cost*(o?2:1)*(G.field>0?.7:1));
-function cast(i,o){if(!G||!G.running||G.mode!=='fight')return;const s=S.g.spells[i],p=G.p;if(!s||s.cur>0||G.gcd>0)return;
+function cast(i,o){if(!G||!G.running||G.mode!=='fight')return;const s=G.sp[i],p=G.p;if(!s||s.cur>0||G.gcd>0)return;
   const c=costOf(s,o),ovf=overflow(),pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1));
   if(ovf){if(G.hp<=Math.ceil(c/2)+1)return;G.hp-=Math.ceil(c/2)}else{if(G.mp<c)return;G.mp-=c}
   s.cur=Math.round((s.cd+.6)*60);G.gcd=15;if(o)say('OVERCHARGE: '+s.name+'!');
-  if(s.kind==='dmg'||s.kind==='dot')G.proj.push({x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*4,vy:0,sz:o?6:4,dmg:pw,dot:s.kind==='dot',home:G.field>0,life:90});
+  if(s.kind==='dmg'||s.kind==='dot'){const fx=s.fx||[];for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
   if(s.kind==='heal'){G.hp=Math.min(S.hpMax,G.hp+pw);pop(p,'+'+pw,'#4caf7d')}
   if(s.kind==='shield'){G.sh+=pw;pop(p,'+'+pw+' shield','#4a8fd9')}
   if(s.recoil){G.hp-=s.recoil;pop(p,'-'+s.recoil,'#d9534f')}
@@ -250,13 +251,14 @@ function step(){
   if(G.exh>0)G.exh--;else G.mp=Math.min(S.mpMax,G.mp+7/60*(has('Meditation')&&G.still>60?3:1));
   if(G.armor){G.mp-=2/60;if(G.mp<=0){G.mp=0;G.armor=false;say('Mana Armor broke!')}}
   G.field--;G.fieldCd--;G.mel--;G.swing--;
-  S.g.spells.forEach(s=>s.cur>0&&s.cur--);G.gcd--;p.inv--;if(G.bT>0)G.bT--;
+  G.sp.forEach(s=>s.cur>0&&s.cur--);G.gcd--;p.inv--;if(G.bT>0)G.bT--;
   G.proj=G.proj.filter(q=>{if(q.home){const t=G.en.filter(e=>!e.dead&&Math.abs(e.x-q.x)<100).sort((a,b)=>Math.abs(a.x-q.x)-Math.abs(b.x-q.x))[0];
       if(t)q.vy=Math.max(-2,Math.min(2,q.vy+Math.sign(t.y+t.h/2-q.y)*.3))}
     q.x+=q.vx;q.y+=q.vy;q.life--;if(q.life<=0||solidAt(q.x+2,q.y+1))return false;
-    const e=G.en.find(e=>!e.dead&&ov({x:q.x,y:q.y,w:q.sz,h:q.sz-1},e));if(e){if(q.dot){e.dot=q.dmg;e.dotT=180;pop(e,'cursed','#a6e22e')}else hurt(e,Math.round(q.dmg*(0.9+Math.random()*.2)));return false}return true});
+    const e=G.en.find(e=>!e.dead&&!(q.hit&&q.hit.includes(e))&&ov({x:q.x,y:q.y,w:q.sz,h:q.sz-1},e));if(e){applyHit(q,e);if(!q.fx.includes('pierce'))return false;(q.hit=q.hit||[]).push(e)}return true});
   for(const e of G.en){if(e.dead)continue;
-    if(move(e)||(e.on&&!solidAt(e.vx>0?e.x+e.w+1:e.x-1,e.y+e.h+2)))e.vx*=-1;
+    const v0=e.vx;if(e.frz>0){e.frz--;e.vx=0}else if(e.slw>0){e.slw--;e.vx=v0*.4}
+    const bump=move(e);e.vx=v0;if(!(e.frz>0)&&(bump||(e.on&&!solidAt(e.vx>0?e.x+e.w+1:e.x-1,e.y+e.h+2))))e.vx*=-1;
     if(e.y>H){e.dead=1;continue}
     if(e.tr.includes('regen'))e.hp=Math.min(e.hpMax,e.hp+e.hpMax*.04/60);
     if(e.tr.includes('enrage'))e.atk*=1.0005;
@@ -285,7 +287,7 @@ function draw(){
   else{const fx=G.flagX-cam,locked=G.en.some(e=>e.boss&&!e.dead);
   c.fillStyle='#ccc';c.fillRect(fx,G.flagY-56,2,56);c.fillStyle=locked?'#d9534f':'#ffd700';for(let i=0;i<8;i++)c.fillRect(fx+2,G.flagY-56+i,12-i*1.5,1)}
   for(const e of G.en){if(e.dead)continue;const x=e.x-cam;if(x<-20||x>W+20)continue;
-    spr(c,SPR.blob,x,e.y,{w:'#fff',b:'#000'},e.col,e.boss?2:1,e.vx<0);
+    spr(c,SPR.blob,x,e.y,{w:'#fff',b:'#000'},e.frz>0?'#9ee7ff':e.col,e.boss?2:1,e.vx<0);
     c.fillStyle='#000';c.fillRect(x,e.y-4,e.w,2);c.fillStyle='#d9534f';c.fillRect(x,e.y-4,e.w*Math.max(0,e.hp)/e.hpMax,2);
     c.font='8px monospace';c.fillStyle='#ffb020';c.fillText((e.boss?e.name+' ':'')+(has('Mana Sense')?e.tr.map(t=>t[0].toUpperCase()).join('')+' '+Math.ceil(e.hp):e.tr.length?'?':''),x,e.y-6)}
   for(const q of G.proj){c.fillStyle=q.dot?'#a6e22e':elc();c.fillRect(q.x-cam,q.y,q.sz,q.sz-1);c.globalAlpha=.5;c.fillRect(q.x-cam-q.vx,q.y+1,3,1);c.globalAlpha=1}
@@ -311,6 +313,61 @@ function finish(won){
   <p>Lv ${S.lv} · XP ${S.xp}/${xpNeed()}</p>${bar(S.xp,xpNeed(),'var(--acc)')}<button onclick="app.innerHTML=''">Back to town</button></div>`;
 }
 function leave(){if(!G)return;G.running=0;save();startTown();G.p.x=24*T}
+
+// ---------- GRANTED SPELLS / LOADOUT / SPELL SAGE ----------
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function grantSpell(){if(S.g.spells.length>=16)return;const kinds=['dmg','dot','shield','dmg','heal'],r=rng(S.g.seed+S.lv*31);
+  const s=genSpell(r,S.g.el,kinds[(S.lv/2|0)%5],S.g.mult*(1+S.lv*.08),1);s.cd=Math.max(1,s.cd);s.src='grant';
+  s.fx=s.kind==='dmg'&&r()<.6?[pick(r,['pierce','slow','multi','drain','fast','big'])]:[];
+  S.g.spells.push(s);fixLoad();if(S.load.length<5)S.load.push(S.g.spells.length-1);say('Your grimoire reveals: '+s.name+'!')}
+function fixLoad(){S.load=(S.load||[]).filter(i=>i<S.g.spells.length);if(!S.load.length)S.load=S.g.spells.map((_,i)=>i).slice(0,5)}
+function screenLoadout(){fixLoad();const tag={grant:'granted',forge:'forged'};
+  app.innerHTML=`<h1>Loadout</h1><div class="card"><p class="mute">Pick up to 5 spells to bring into battle. Keys 1–5 follow this order.</p>${S.g.spells.map((s,i)=>{const k=S.load.indexOf(i);
+  return `<div><button onclick="toggleLoad(${i})">${k>=0?'['+(k+1)+'] ✔':'+ add'}</button> <b>${s.name}</b> <span class="tag">${tag[s.src]||(i<4?'starter':'forged')}</span> <span class="mute">${desc(s)}</span></div>`}).join('')}
+  <button onclick="screenHub()">Done</button></div>`}
+function toggleLoad(i){const k=S.load.indexOf(i);if(k>=0){if(S.load.length>1)S.load.splice(k,1)}else if(S.load.length<5)S.load.push(i);save();screenLoadout()}
+const SAGE_FX={pierce:/pierc|through|penetrat/,multi:/multi|spread|three|scatter|many|volley/,freeze:/freez|frozen|stun|paraly|petrif/,slow:/slow|chill|snare|sluggish/,
+  pull:/pull|drag|toward|attract|magnet/,push:/push|knock|repel|blow away/,drain:/drain|steal|lifesteal|vampir|absorb/,fast:/fast|quick|speed|swift/,big:/big|huge|giant|large|massive/};
+const SAGE_NO=[[/instant ?kill|one ?shot|kill (all|every)|insta/,'No spell can end a foe in one blow — every enemy must be worn down.'],
+  [/infinite|unlimited|forever|endless|no (cost|mana|cooldown|drawback)/,'All magic has a price. Nothing here is free or endless.'],
+  [/invincib|immortal|cant die|can't die|never die|god ?mode|untouchable/,'Not even the greatest mages are untouchable.'],
+  [/reviv|resurrect|bring back/,'Bringing back the fallen is beyond any grimoire.'],
+  [/stop time|time stop|whole (screen|map|world)|every enemy|all enemies/,'That would bend the whole world — far too vast for one spell.'],
+  [/teleport|\bfly\b|flight|levitat/,'Movement magic is beyond what your grimoire can write… for now.']];
+function sageParse(txt){const t=' '+txt.toLowerCase()+' ';
+  for(const[re,why]of SAGE_NO)if(re.test(t))return{msg:'Hmm… that is not possible. '+why+' Try describing something with a clear cost.'};
+  if(BANNED.test(t))return{msg:'Let us keep our magic family-friendly, young mage.'};
+  const kind=/heal|mend|restor|cure|recover/.test(t)?'heal':/shield|barrier|wall|protect|block|guard|armou?r/.test(t)?'shield':/poison|burn|curse|over time|bleed|toxic|decay|rot\b/.test(t)?'dot':'dmg';
+  let fx=Object.keys(SAGE_FX).filter(k=>SAGE_FX[k].test(t));const notes=[];
+  if(fx.includes('freeze'))fx=fx.filter(f=>f!=='slow');
+  if(fx.includes('pull')&&fx.includes('push'))return{msg:'A spell cannot both pull and push. Choose one and ask again.'};
+  if((kind==='heal'||kind==='shield')&&fx.length){notes.push(`${kind==='heal'?'Healing':'Shield'} magic cannot carry ${fx.join('/')} effects, so I left them out.`);fx=[]}
+  if(fx.length>3)return{msg:`That is too many effects for one spell (${fx.join(', ')}). The limit is 3. Simplify it and ask again.`};
+  const cap=4+Math.floor(S.lv/2);let tier=3+(/strong|powerful|mighty|devastat|ultimate/.test(t)?2:0)-(/weak|small|tiny|light/.test(t)?1:0);
+  if(tier>cap){notes.push(`At level ${S.lv} I can only weave power tier ${cap}.`);tier=cap}tier=Math.max(1,tier);
+  const other=Object.keys(ELEMENTS).find(el=>el!==S.g.el&&new RegExp('\\b'+el.toLowerCase()).test(t));
+  if(other)notes.push(`Your grimoire channels ${S.g.el} magic, not ${other}, so I will shape it as ${S.g.el}.`);
+  let d=/recoil|hurt (me|myself)|self.?damage|backfire/.test(t)?'recoil':/cooldown|recharge|long wait/.test(t)?'cd':/expensive|costly|lots of mana|more mana/.test(t)?'burn':/exhaust|tired/.test(t)?'exhaust':null;
+  if(!d){d=['recoil','cd','burn','exhaust'][(tier+fx.length)%4];notes.push('Every spell needs a drawback, so I picked one for you.')}
+  const s=buildSpell(kind,tier,d,'');s.fx=fx;s.src='forge';if(fx.length){s.cost=Math.round(s.cost*(1+.25*fx.length));s.power=Math.round(s.power*(1-.08*fx.length))}
+  return{ok:1,spell:s,msg:'Yes, that is possible! '+notes.join(' ')+' It would work like this: '+desc(s)+'.'}}
+let sageLog=[],sagePending=null;
+function screenSage(){if(!S)return;
+  app.innerHTML=`<h1>Spell Sage</h1><div class="card">${sageLog.map(x=>`<p>${x}</p>`).join('')||'<p>🧙 <i>"Describe the spell you dream of and I will tell you whether your grimoire can hold it. I understand effects like pierce, freeze, slow, pull, push, drain, multi, fast and big, plus heals, shields and curses. Name a drawback if you like."</i></p>'}</div>
+  <textarea id="sq" rows="2" maxlength="200" style="width:100%;background:#0e0c14;color:var(--ink);border:1px solid #453d5e;border-radius:6px;padding:6px;font:inherit" placeholder="e.g. a strong beam that pierces and slows enemies"></textarea>
+  <button onclick="sageAsk()">Ask the Sage</button><button onclick="sageLog=[];sagePending=null;app.innerHTML=''">Leave</button>
+  ${sagePending?`<div class="card">Name it: <input id="sn" maxlength="24"> <button onclick="sageForge()">Forge it (1 Forge point, you have ${S.forgePts})</button><p id="serr" style="color:var(--bad)"></p></div>`:''}`}
+function sageAsk(){const q=$('sq').value.trim();if(!q)return;const r=sageParse(q);sageLog.push('🗨️ <b>You:</b> '+esc(q),'🧙 <b>Sage:</b> '+r.msg);sageLog=sageLog.slice(-8);sagePending=r.ok?r.spell:null;screenSage()}
+function sageForge(){const n=$('sn').value.trim().replace(/\s+/g,' '),er=m=>$('serr').textContent=m;
+  if(!/^[A-Za-z ]{3,24}$/.test(n))return er('Name must be 3–24 letters.');if(BANNED.test(n))return er('Please choose a family-friendly name.');
+  if(!S.forgePts)return er('You need a Forge point (earned every 3 levels).');if(S.g.spells.length>=16)return er('Your grimoire is full (16 spells).');
+  const s=sagePending;s.name=n;S.g.spells.push(s);S.forgePts--;fixLoad();if(S.load.length<5)S.load.push(S.g.spells.length-1);save();
+  sageLog.push('🧙 <b>Sage:</b> "'+esc(n)+'" is now written in your grimoire!');sagePending=null;screenSage()}
+function applyHit(q,e){const f=q.fx,dir=G.p.x<e.x?1:-1;
+  if(q.dot){e.dot=q.dmg;e.dotT=180;pop(e,'cursed','#a6e22e')}
+  else{const d=Math.round(q.dmg*(0.9+Math.random()*.2));hurt(e,d);if(f.includes('drain')){const h=Math.max(1,Math.round(d*.3));G.hp=Math.min(S.hpMax,G.hp+h);pop(G.p,'+'+h,'#4caf7d')}}
+  if(f.includes('freeze')){e.frz=120;pop(e,'frozen','#9ee7ff')}else if(f.includes('slow'))e.slw=240;
+  const k=f.includes('pull')?-24:f.includes('push')?24:0;if(k){e.x+=dir*k;if(box(e))e.x-=dir*k}}
 if(S)S.inv=S.inv||{};
 startTown();
 </script></body></html>
