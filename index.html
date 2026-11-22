@@ -62,7 +62,7 @@ function makeGrimoire(answers){
   const rar=mod[2]>=60?1:mod[2]>=14?2:mod[2]>=8?3:mod[2]>=3?4:5;
   const name=(mod[0]?mod[0]+' ':'')+el+' Magic';
   const spells=['dmg','dmg','shield','heal'].map((k,i)=>genSpell(r,el,k,mod[1],i));
-  return {name,el,rarity:rar,mult:mod[1],seed,spells};
+  return upgradeGrimoire({name,el,rarity:rar,mult:mod[1],seed,spells},r);
 }
 function genSpell(r,el,kind,mult,i){
   const base={dmg:[14,8],heal:[16,10],shield:[14,9],dot:[6,8]}[kind];
@@ -84,16 +84,16 @@ function screenQuiz(){
 }
 function screenReveal(){
   const g=S.g;app.innerHTML=`<h1>Your grimoire opens…</h1><div class="card"><h2 class="r${g.rarity}">${g.name}</h2>
-  <p class="r${g.rarity}">${RARITY[g.rarity]}</p>${spellList(g.spells)}<button onclick="screenHub()">Continue</button></div>`;
+  <p class="r${g.rarity}">${RARITY[g.rarity]} · ${'✦'.repeat(g.marks||3)} ${g.marks||3}-mark grimoire${g.el2?' · DUAL ELEMENT: '+g.el+' + '+g.el2:''}${g.el==='Null'?' · NULL: no spells, but your strikes erase magic and break wards':''}</p>${spellList(g.spells)}<button onclick="screenHub()">Continue</button></div>`;
 }
 function spellList(sp){return sp.map(s=>`<div>• <b>${s.name}</b> <span class="mute">${desc(s)}</span></div>`).join('')}
 function desc(s){let t={dmg:`deals ${s.power}`,heal:`heals ${s.power}`,shield:`blocks ${s.power}`,dot:`${s.power}/sec for 3s`}[s.kind];
   t+=` · ${s.cost} MP`;if(s.cd)t+=` · ${s.cd}s cooldown`;if(s.recoil)t+=` · ${s.recoil} self-damage`;if(s.exhaust)t+=' · no mana regen for 3s';if(s.fx&&s.fx.length)t+=' · '+s.fx.join(', ');return t}
 function screenHub(){
   const g=S.g,need=xpNeed();
-  app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><h2 class="r${g.rarity}">${g.name} <span class="mute">(${RARITY[g.rarity]})</span></h2>
+  app.innerHTML=`<h1>Grimoire Trials</h1><div class="card"><h2 class="r${g.rarity}">${g.name} <span class="mute">(${RARITY[g.rarity]} · ${'✦'.repeat(g.marks||3)})</span></h2><p class="mute">Element family: ${[g.el,g.el2].filter(Boolean).map(x=>(FAMOF(x)||'none')).join(' + ')}</p>
   <p>Level ${S.lv} · XP ${S.xp}/${need} · HP ${S.hpMax} · Mana ${S.mpMax} · Best wave ${S.best}</p>${bar(S.xp,need,'var(--acc)')}
-  ${spellList(g.spells)}<p><b>Techniques</b> <span class="mute">(unlock by leveling)</span></p>${TECH.map(t=>`<div class="${S.lv>=t[1]?"":"mute"}">${S.lv>=t[1]?"✔":"🔒 Lv "+t[1]} <b>${t[0]}</b> — ${t[2]}</div>`).join("")}<p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
+  ${spellList(g.spells)}<p><b>Techniques</b> <span class="mute">(unlock by leveling)</span></p>${TECH.map(t=>`<div class="${S.lv>=t[1]?"":"mute"}">${S.lv>=t[1]?"✔":"🔒 Lv "+t[1]} <b>${t[0]}</b> — ${t[2]}</div>`).join("")}<p><b>Combos</b> <span class="mute">(cast two different spells within 1s)</span></p><div class="mute">${Object.entries(COMBOS).map(([k,v])=>`<b>${v}</b>: ${k.split('>').map(x=>KN[x]).join(' → ')} (${COMBO_INFO[v]})`).join('<br>')}</div><p class="mute">Items: ${Object.entries(S.inv).filter(x=>x[1]).map(([k,v])=>`<span class="tag" title="${ITEMS[k]}">${k} ×${v}</span>`).join('')||'none yet (enemies drop them; bosses drop Star Dust)'}</p><p>
   <button onclick="startFight()">Fight wave ${S.wave}</button>
   <button onclick="screenLoadout()">Loadout (${(S.load||[]).length||Math.min(5,g.spells.length)}/5)</button><button onclick="screenForge()">Spell Forge (${S.forgePts} pts)</button>
   <button onclick="if(confirm('Abandon this grimoire and retake the trial?')){localStorage.removeItem('grimoire');S=null;app.innerHTML=''}">New grimoire</button><button onclick="app.innerHTML=''">Close</button></p>
@@ -141,7 +141,7 @@ const SPR={me:["hh......",".hhhh...","..hhhhh.","hhhhhhhh","..sssss.","..ssese."
  blob:["..oooo..",".oooooo.","owwoowwo","obwoobwo","oooooooo","oooooooo",".o.oo.o.","o..oo..o"]};
 function spr(c,a,x,y,map,col,s,flip){for(let r=0;r<a.length;r++)for(let q=0;q<8;q++){const ch=a[r][flip?7-q:q];if(ch!=='.'){c.fillStyle=map[ch]||col;c.fillRect(Math.round(x+q*s),Math.round(y+r*s),s,s)}}}
 const T=16,W=320,H=180,keys={};let G=null;
-addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase();keys[k]=1;if(!G)return;
+addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase();keys[k]=1;ac();if(k==='m'){muted=!muted;try{localStorage.setItem('mute',muted?'1':'0')}catch(x){}if(G)say('Sound '+(muted?'off':'on'))}if(!G)return;
   if([' ','arrowup','arrowdown'].includes(k))e.preventDefault();
   if(G.mode==='fight'){const n=e.code.startsWith('Digit')?+e.code.slice(5):0;if(n>=1&&n<=8&&!e.repeat)G.chg={i:n-1,t:performance.now()};
     if(k==='escape')leave();if(k==='f'||k==='j')melee();if(k==='q'&&has('Mana Armor')){G.armor=!G.armor;say('Mana Armor '+(G.armor?'ON':'off'))}
@@ -157,8 +157,8 @@ function startTown(){
   const cols=32,grid=[];for(let x=0;x<cols;x++){const c=new Array(12).fill(0);for(let y=9;y<12;y++)c[y]=1;grid.push(c)}
   G={mode:'town',parts:[],shake:0,air:0,dashT:0,eproj:[],grid,cols,en:[],sc:1,p:{x:S?11*T:2*T,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:1,mp:0,sh:0,exh:0,proj:[],pops:[],gcd:0,msgs:[],
      banner:S?'':'Walk to the Trial Shrine and press E',bT:S?0:600,t:0,acc:0,last:performance.now(),running:1,c:$('cv').getContext('2d')};
-  $('ttl').textContent='Town of Beginnings';$('hud').innerHTML='<div id="hs"></div>';
-  $('help').innerHTML='Move ←/→ or A/D · Jump Space/W/↑ · Use a building: walk up to it and press E (or ↓ / Act) · Esc closes menus';
+  music('town');$('ttl').textContent='Town of Beginnings';$('hud').innerHTML='<div id="hs"></div>';
+  $('help').innerHTML='Move ←/→ or A/D · Jump Space/W/↑ · Use a building: walk up to it and press E (or ↓ / Act) · Esc closes menus · M mutes sound';
   updHud();const g=G;requestAnimationFrame(t=>loop(t,g));
 }
 function drawStation(c,s,x,y,t){const ec=S?elc():'#c9a54a';
@@ -182,7 +182,7 @@ function startFight(){
   const en=[],n=4+w;
   function spawn(cx,b){const fi=(w-1+en.length)%FOES.length,tr=w<3?[]:(b||r()<.4+w*.03)?[tk[Math.floor(r()*5)]]:[];
     if(b&&w>=10)tr.push(tk[(tk.indexOf(tr[0])+1)%5]);
-    en.push({name:(b?'Boss ':'')+FOES[fi],col:`hsl(${fi*47%360},65%,55%)`,boss:b,tr,x:cx*T,y:0,w:b?16:8,h:b?16:8,vx:(r()<.5?-1:1)*(tr.includes('swift')?1:.5),vy:0,
+    const fm=w<2?null:Object.keys(FAM)[Math.floor(r()*6)];en.push({fam:fm,name:(b?'Boss ':'')+FOES[fi],col:fm?FAMCOL[fm]:`hsl(${fi*47%360},65%,55%)`,boss:b,tr,x:cx*T,y:0,w:b?16:8,h:b?16:8,vx:(r()<.5?-1:1)*(tr.includes('swift')?1:.5),vy:0,
       hp:Math.round((b?150:25)*sc),atk:Math.round((b?14:8)*sc),dot:0,dotT:0})}
   for(let i=0;i<n;i++)spawn(14+Math.floor((cols-30)*i/n+r()*3),false);
   if(boss){spawn(cols-9,true);const bi=(w/5-1)%4,bz=en[en.length-1];bz.name=BOSSES[bi][0];bz.pat=[BOSSES[bi][1]].concat(w>=25?[BOSSES[(bi+1)%4][1]]:[]);bz.bt=0}
@@ -191,9 +191,9 @@ function startFight(){
   G={mode:'fight',parts:[],shake:0,air:0,jPrev:0,dashT:0,dashCd:0,fly:false,hov:0,eproj:[],bossSeen:0,sp:(fixLoad(),S.load.map(i=>S.g.spells[i])),field:0,fieldCd:0,mel:0,swing:0,still:0,armor:false,enh:false,chg:null,grid,cols,en,sc,boss,p:{x:24,y:0,vx:0,vy:0,w:8,h:12,dir:1,on:0,inv:0},hp:S.hpMax,mp:S.mpMax,sh:0,exh:0,proj:[],pops:[],gcd:0,
      msgs:[],banner:'',bT:0,flagX:fc*T,flagY:grid[fc].indexOf(1)*T,lastSafe:24,t:0,acc:0,last:performance.now(),running:1};
   G.sp.forEach(s=>s.cur=0);
-  app.innerHTML='';$('ttl').textContent=`Wave ${w}${boss?' — BOSS':''}`;
+  music('fight');app.innerHTML='';$('ttl').textContent=`Wave ${w}${boss?' — BOSS':''}`;
   $('hud').innerHTML=`<div id="hs"></div>${G.sp.map((s,i)=>`<button id="sb${i}" onclick="cast(${i})">[${i+1}] ${s.name}<br><span class="mute">${desc(s)}</span></button>`).join('')}<button onclick="leave()">Retreat to town</button>`;
-  $('help').innerHTML=`Move ←/→ or A/D · Jump Space/W/↑ · Cast with number keys (hold 0.6s to overcharge) · F melee · X dash · V flight · Shift enhance · Q armor · R field · jump again mid-air / hold jump to hover (as you unlock them) · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · Esc retreats.
+  $('help').innerHTML=`Move ←/→ or A/D · Jump Space/W/↑ · Cast with number keys (hold 0.6s to overcharge) · F melee · X dash · V flight · Shift enhance · Q armor · R field · jump again mid-air / hold jump to hover (as you unlock them) · M mutes sound<br>Enemy color = element: <b style="color:#ff6a3d">fire</b> beats <b style="color:#5fd068">nature</b> beats <b style="color:#ffe14d">storm</b> beats <b style="color:#3da5ff">water</b> beats fire; <b style="color:#fff3b0">light</b> and <b style="color:#a070ff">shadow</b> beat each other. Cast two different spells within 1s for a combo. · Land on enemies to stomp them · Reach the flag${boss?' (beat the boss first)':''} · Esc retreats.
   Letters above enemies = traits: ${Object.entries(TRAITS).map(([k,v])=>`<b>${k[0].toUpperCase()}</b> ${v}`).join(' · ')}`;
   G.c=$('cv').getContext('2d');updHud();const g=G;requestAnimationFrame(t=>loop(t,g));
 }
@@ -210,11 +210,11 @@ function move(o){let bx=0;o.x+=o.vx;if(box(o)){o.x=o.vx>0?Math.floor((o.x+o.w)/T
   if(box(o)){if(o.vy>0){o.y=Math.floor((o.y+o.h)/T)*T-o.h;o.on=1}else o.y=Math.floor(o.y/T+1)*T;o.vy=0}return bx}
 const ov=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 function gainXP(x){S.xp+=x;while(S.xp>=xpNeed()){S.xp-=xpNeed();S.lv++;S.hpMax+=12;S.mpMax+=6;if(G)G.hp+=12;S.g.spells.forEach(s=>s.power=Math.round(s.power*1.06));
-  say('Level up! Lv '+S.lv);TECH.filter(t=>t[1]===S.lv).forEach(t=>say('New technique: '+t[0]+'!'));if(S.lv%2===0)grantSpell();if(S.lv%3===0){S.forgePts++;say('+1 Forge point!')}}}
+  sfx('level');say('Level up! Lv '+S.lv);TECH.filter(t=>t[1]===S.lv).forEach(t=>say('New technique: '+t[0]+'!'));if(S.lv%2===0)grantSpell();if(S.lv%3===0){S.forgePts++;say('+1 Forge point!')}}}
 function say(m){if(G){G.msgs.push(m);G.banner=m;G.bT=120}}
-function hurt(e,d){if(e.dead)return;if(e.ward)return pop(e,'warded','#ccc');burst(e.x+e.w/2,e.y+e.h/2,'#fff',5,1.5);G.shake=Math.max(G.shake,1.5);if(e.tr.includes('armored'))d=Math.round(d*.7);e.hp-=d;pop(e,'-'+d,'#fff');
-  if(e.hp<=0){e.dead=1;burst(e.x+e.w/2,e.y+e.h/2,e.col,e.boss?50:18,e.boss?3:2);G.shake=Math.max(G.shake,e.boss?9:3);gainXP(Math.round((e.boss?30:4)*G.sc));const ik=Object.keys(ITEMS),n=e.boss?2:Math.random()<.25?1:0;
-    for(let i=0;i<n;i++){const it=ik[Math.floor(Math.random()*(e.boss?4:3))];S.inv[it]=(S.inv[it]||0)+1;say('Found: '+it+'!')}}}
+function hurt(e,d,nw){if(e.dead)return;if(e.ward&&!nw)return pop(e,'warded','#ccc');sfx('hit');burst(e.x+e.w/2,e.y+e.h/2,'#fff',5,1.5);G.shake=Math.max(G.shake,1.5);if(e.tr.includes('armored')&&!nw)d=Math.round(d*.7);e.hp-=d;pop(e,'-'+d,'#fff');
+  if(e.hp<=0){e.dead=1;burst(e.x+e.w/2,e.y+e.h/2,e.col,e.boss?50:18,e.boss?3:2);G.shake=Math.max(G.shake,e.boss?9:3);sfx('kill');gainXP(Math.round((e.boss?30:4)*G.sc));const ik=Object.keys(ITEMS),n=e.boss?2:Math.random()<.25?1:0;
+    for(let i=0;i<n;i++){const it=ik[Math.floor(Math.random()*(e.boss?4:3))];S.inv[it]=(S.inv[it]||0)+1;sfx('pick');say('Found: '+it+'!')}}}
 const TECH=[['Weapon Infusion',1,'F: free melee swing charged with your element'],['Overcharge',1,'Hold a spell key 0.6s then release: 2× power, 2× cost'],
   ['Meditation',1,'Stand still for 1s to regen mana 3× faster'],['Physical Enhancement',2,'Hold Shift: faster, higher jumps, 2× stomps — drains 10 mana/s'],
   ['Mana Armor',3,'Q toggles: hits drain mana before HP (2 mana/s upkeep)'],['Mana Sense',4,'See enemy traits and exact HP'],
@@ -226,16 +226,20 @@ const has=n=>!!S&&S.lv>=TECH.find(t=>t[0]===n)[1];
 const overflow=()=>has('Mana Overflow')&&G.hp<S.hpMax*.2;
 const costOf=(s,o)=>Math.round(s.cost*(o?2:1)*(G.field>0?.7:1));
 function cast(i,o){if(!G||!G.running||G.mode!=='fight')return;const s=G.sp[i],p=G.p;if(!s||s.cur>0||G.gcd>0)return;
-  const c=costOf(s,o),ovf=overflow(),pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1));
+  const c=costOf(s,o),ovf=overflow();let pw=Math.round(s.power*(o?2:1)*(ovf?1.5:1));
   if(ovf){if(G.hp<=Math.ceil(c/2)+1)return;G.hp-=Math.ceil(c/2)}else{if(G.mp<c)return;G.mp-=c}
-  s.cur=Math.round((s.cd+.6)*60);G.gcd=15;burst(p.x+(p.dir>0?9:-1),p.y+6,elc(),6,1.2);if(o)say('OVERCHARGE: '+s.name+'!');
-  if(s.kind==='dmg'||s.kind==='dot'){const fx=s.fx||[];for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
+  s.cur=Math.round((s.cd+.6)*60);G.gcd=15;burst(p.x+(p.dir>0?9:-1),p.y+6,elc(),6,1.2);sfx('cast');if(o)say('OVERCHARGE: '+s.name+'!');
+  let combo=null,xfx=[],det=0;if(G.last&&G.t-G.last.t<60&&G.last.i!==i)combo=COMBOS[G.last.k+'>'+s.kind];G.last={i,k:s.kind,t:G.t};
+  if(combo){say('COMBO: '+combo+'!');sfx('combo');burst(p.x+4,p.y+6,'#ffd700',14,2);if(/Chain/.test(combo))pw*=1.3;if(/Sanctuary|Second/.test(combo))pw*=1.5;if(/Deep/.test(combo))pw*=2;
+    if(/Bulwark/.test(combo))xfx.push('pierce');if(/Life/.test(combo))xfx.push('drain');if(/Plague/.test(combo))xfx.push('multi');if(/Detonation/.test(combo))det=1;pw=Math.round(pw);G.last=null}
+  if(s.kind==='dmg'||s.kind==='dot'){const fx=[...(s.fx||[]),...xfx];for(const vy of fx.includes('multi')?[-1,0,1]:[0])G.proj.push({el:s.el||S.g.el,det,x:p.x+(p.dir>0?8:-4),y:p.y+5,vx:p.dir*(fx.includes('fast')?6.5:4),vy,sz:(o?6:4)+(fx.includes('big')?3:0),dmg:pw,dot:s.kind==='dot',home:G.field>0,fx,life:90})}
   if(s.kind==='heal'){G.hp=Math.min(S.hpMax,G.hp+pw);pop(p,'+'+pw,'#4caf7d')}
   if(s.kind==='shield'){G.sh+=pw;pop(p,'+'+pw+' shield','#4a8fd9')}
   if(s.recoil){G.hp-=s.recoil;pop(p,'-'+s.recoil,'#d9534f')}
   if(s.exhaust)G.exh=180;updHud()}
 function melee(){if(!G||G.mode!=='fight'||G.mel>0||!has('Weapon Infusion'))return;const p=G.p;G.mel=24;G.swing=10;
-  const hb={x:p.dir>0?p.x+8:p.x-14,y:p.y-2,w:14,h:16};G.en.forEach(e=>{if(!e.dead&&ov(hb,e))hurt(e,6+S.lv*2)})}
+  const hb={x:p.dir>0?p.x+8:p.x-14,y:p.y-2,w:14,h:16};const nl=S.g.el==='Null';if(nl)G.mel=14;sfx('swing');G.en.forEach(e=>{if(!e.dead&&ov(hb,e))hurt(e,Math.round((6+S.lv*2)*(nl?3:affMul(S.g.el,e))),nl)});
+  if(nl)G.eproj=G.eproj.filter(q=>!ov({x:q.x,y:q.y,w:4,h:4},hb))}
 function field(){if(!has('Mana Field'))return;if(G.fieldCd>0)return say('Mana Field recharging…');if(G.mp<30)return say('Need 30 mana');
   G.mp-=30;G.field=360;G.fieldCd=1200;say('Mana Field!')}
 function techLine(){const t=[];if(has('Dash'))t.push(`Dash [X]${G.dashCd>0?' …':''}`);if(has('Flight'))t.push(`Flight [V] ${G.fly?'<b>ON</b>':'off'}`);if(G.hov)t.push('<b>Hovering</b>');if(has('Weapon Infusion'))t.push(`Melee [F]${G.mel>0?' …':''}`);if(has('Physical Enhancement'))t.push(`Enhance [Shift]${G.enh?' <b>ON</b>':''}`);
@@ -249,8 +253,8 @@ function step(){
   const jp=J&&!G.jPrev;G.jPrev=J;const D=!b0&&(keys.arrowdown||keys.s);
   if(G.dashT>0){G.dashT--;p.vx=p.dir*5;p.vy=-.35;burst(p.x+4,p.y+6,elc(),2,.5)}
   if(G.fly){if(G.mp<=0){G.fly=false;say('Out of mana: flight ends')}else{G.mp-=12/60;p.vy=(J?-2:D?2:0)-.35}}
-  else{if(J&&p.on){p.vy=enh?-7.4:-6.2;p.on=0;burst(p.x+4,p.y+12,'#d8c8a8',4,.8)}
-    else if(jp&&!p.on&&G.air<1&&has('Double Jump')){p.vy=enh?-6.6:-5.6;G.air=1;pop(p,'^','#fff')}
+  else{if(J&&p.on){p.vy=enh?-7.4:-6.2;p.on=0;burst(p.x+4,p.y+12,'#d8c8a8',4,.8);sfx('jump')}
+    else if(jp&&!p.on&&G.air<1&&has('Double Jump')){p.vy=enh?-6.6:-5.6;G.air=1;pop(p,'^','#fff');sfx('jump')}
     if(!J&&p.vy<-2)p.vy=-2}
   const vyb=p.vy;move(p);if(p.on)G.air=0;if(p.on&&!G.wasOn&&vyb>3)burst(p.x+4,p.y+12,'#d8c8a8',6,1);G.wasOn=p.on;if(p.y<0){p.y=0;p.vy=0}
   G.hov=!G.fly&&G.mode==='fight'&&has('Hover')&&J&&!p.on&&p.vy>.6&&G.mp>0;if(G.hov){p.vy=.6;G.mp-=4/60}
@@ -281,7 +285,7 @@ function step(){
       if(p.vy>0&&p.y+p.h-e.y<7){hurt(e,(10+S.lv*3)*(G.enh?2:1));p.vy=-4.5}
       else if(p.inv<=0){let a=Math.round(e.atk*(0.8+Math.random()*.4));const b=Math.min(G.sh,a);G.sh-=b;a-=b;
         if(G.armor&&a){const m=Math.min(Math.floor(G.mp),a);G.mp-=m;a-=m;if(m)pop(e,'-'+m+' MP','#4a8fd9')}G.hp-=a;
-        pop(p,a?'-'+a:'blocked',a?'#d9534f':'#4a8fd9');p.inv=60;G.shake=4;burst(p.x+4,p.y+6,'#ff6060',8,1.5);p.vy=-3;const k=p.x<e.x?-12:12;p.x+=k;if(box(p))p.x-=k;
+        pop(p,a?'-'+a:'blocked',a?'#d9534f':'#4a8fd9');p.inv=60;G.shake=4;sfx('hurt');burst(p.x+4,p.y+6,'#ff6060',8,1.5);p.vy=-3;const k=p.x<e.x?-12:12;p.x+=k;if(box(p))p.x-=k;
         if(e.tr.includes('drain')){G.mp=Math.max(0,G.mp-6);pop(e,'-6 mana','#4a8fd9')}}}}
   G.eproj=G.eproj.filter(q=>{q.x+=q.vx;q.y+=q.vy;q.life--;if(q.life<=0||solidAt(q.x+2,q.y+2))return false;
     if(ov({x:q.x,y:q.y,w:4,h:4},p)){if(p.inv<=0)hitPlayer(q.dmg);return false}return true});
@@ -321,7 +325,7 @@ function draw(){
     if(e.boss){c.fillStyle='#eee';c.fillRect(x+2,e.y-3,2,4);c.fillRect(x+12,e.y-3,2,4)}if(e.ward){c.strokeStyle='#7ddc6a';c.strokeRect(x-2.5,e.y-2.5,e.w+5,e.h+5)}
     c.fillStyle='#000';c.fillRect(x,e.y-4,e.w,2);c.fillStyle='#d9534f';c.fillRect(x,e.y-4,e.w*Math.max(0,e.hp)/e.hpMax,2);
     c.font='8px monospace';c.fillStyle='#ffb020';c.fillText((e.boss?e.name+' ':'')+(has('Mana Sense')?e.tr.map(t=>t[0].toUpperCase()).join('')+' '+Math.ceil(e.hp):e.tr.length?'?':''),x,e.y-6)}
-  for(const q of G.proj){const col=q.dot?'#a6e22e':elc();glow(c,q.x-cam+q.sz/2,q.y+q.sz/2,8+q.sz,rgba(col,.6));c.fillStyle=col;c.fillRect(q.x-cam,q.y,q.sz,q.sz-1);c.fillStyle='#fff';c.fillRect(q.x-cam+1,q.y+1,Math.max(1,q.sz-3),Math.max(1,q.sz-3))}
+  for(const q of G.proj){const col=q.dot?'#a6e22e':(EL_COL[q.el]||elc());glow(c,q.x-cam+q.sz/2,q.y+q.sz/2,8+q.sz,rgba(col,.6));c.fillStyle=col;c.fillRect(q.x-cam,q.y,q.sz,q.sz-1);c.fillStyle='#fff';c.fillRect(q.x-cam+1,q.y+1,Math.max(1,q.sz-3),Math.max(1,q.sz-3))}
   for(const q of G.eproj){glow(c,q.x-cam+2,q.y+2,10,'rgba(255,90,40,.6)');c.fillStyle='#ff5030';c.fillRect(q.x-cam,q.y,4,4);c.fillStyle='#ffd080';c.fillRect(q.x-cam+1,q.y+1,2,2)}
   if(S)glow(c,p.x-cam+4,p.y+6,18,rgba(elc(),.22));
   const ms=p.on&&Math.abs(p.vx)>0&&(G.t/6|0)%2?SPR.me2:SPR.me;
@@ -348,7 +352,7 @@ function draw(){
 }
 function finish(won){
   G.running=0;const w=S.wave;
-  if(won){const xp=Math.round(20*Math.pow(1.22,w-1));G.msgs.unshift(`Victory! +${xp} XP for clearing the wave`);gainXP(xp);S.wave++;S.best=Math.max(S.best,S.wave)}
+  if(won){sfx('win');const xp=Math.round(20*Math.pow(1.22,w-1));G.msgs.unshift(`Victory! +${xp} XP for clearing the wave`);gainXP(xp);S.wave++;S.best=Math.max(S.best,S.wave)}
   else{S.wave=Math.max(1,w-2);G.msgs.unshift(`Defeated… you retreat to wave ${S.wave}.`)}
   save();const m=G.msgs;startTown();G.p.x=24*T;
   app.innerHTML=`<h1>${won?'Wave cleared!':'Defeated'}</h1><div class="card">${m.map(x=>`<div>${x}</div>`).join('')}
@@ -358,8 +362,8 @@ function leave(){if(!G)return;G.running=0;save();startTown();G.p.x=24*T}
 
 // ---------- GRANTED SPELLS / LOADOUT / SPELL SAGE ----------
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function grantSpell(){if(S.g.spells.length>=16)return;const kinds=['dmg','dot','shield','dmg','heal'],r=rng(S.g.seed+S.lv*31);
-  const s=genSpell(r,S.g.el,kinds[(S.lv/2|0)%5],S.g.mult*(1+S.lv*.08),1);s.cd=Math.max(1,s.cd);s.src='grant';
+function grantSpell(){if(S.g.spells.length>=16||S.g.el==='Null')return;const kinds=['dmg','dot','shield','dmg','heal'],r=rng(S.g.seed+S.lv*31);
+  const gel=S.g.el2&&S.lv%4===0?S.g.el2:S.g.el,s=genSpell(r,gel,kinds[(S.lv/2|0)%5],S.g.mult*(1+S.lv*.08),1);s.cd=Math.max(1,s.cd);s.src='grant';s.el=gel;
   s.fx=s.kind==='dmg'&&r()<.6?[pick(r,['pierce','slow','multi','drain','fast','big'])]:[];
   S.g.spells.push(s);fixLoad();if(S.load.length<5)S.load.push(S.g.spells.length-1);say('Your grimoire reveals: '+s.name+'!')}
 function fixLoad(){S.load=(S.load||[]).filter(i=>i<S.g.spells.length);if(!S.load.length)S.load=S.g.spells.map((_,i)=>i).slice(0,5)}
@@ -387,7 +391,7 @@ function sageParse(txt){const t=' '+txt.toLowerCase()+' ';
   if(fx.length>3)return{msg:`That is too many effects for one spell (${fx.join(', ')}). The limit is 3. Simplify it and ask again.`};
   const cap=4+Math.floor(S.lv/2);let tier=3+(/strong|powerful|mighty|devastat|ultimate/.test(t)?2:0)-(/weak|small|tiny|light/.test(t)?1:0);
   if(tier>cap){notes.push(`At level ${S.lv} I can only weave power tier ${cap}.`);tier=cap}tier=Math.max(1,tier);
-  const other=Object.keys(ELEMENTS).find(el=>el!==S.g.el&&new RegExp('\\b'+el.toLowerCase()).test(t));
+  const other=Object.keys(ELEMENTS).find(el=>el!==S.g.el&&el!==S.g.el2&&new RegExp('\\b'+el.toLowerCase()).test(t));
   if(other)notes.push(`Your grimoire channels ${S.g.el} magic, not ${other}, so I will shape it as ${S.g.el}.`);
   let d=/recoil|hurt (me|myself)|self.?damage|backfire/.test(t)?'recoil':/cooldown|recharge|long wait/.test(t)?'cd':/expensive|costly|lots of mana|more mana/.test(t)?'burn':/exhaust|tired/.test(t)?'exhaust':null;
   if(!d){d=['recoil','cd','burn','exhaust'][(tier+fx.length)%4];notes.push('Every spell needs a drawback, so I picked one for you.')}
@@ -406,18 +410,19 @@ function sageForge(){const n=$('sn').value.trim().replace(/\s+/g,' '),er=m=>$('s
   const s=sagePending;s.name=n;S.g.spells.push(s);S.forgePts--;fixLoad();if(S.load.length<5)S.load.push(S.g.spells.length-1);save();
   sageLog.push('🧙 <b>Sage:</b> "'+esc(n)+'" is now written in your grimoire!');sagePending=null;screenSage()}
 function applyHit(q,e){const f=q.fx,dir=G.p.x<e.x?1:-1;
-  if(q.dot){e.dot=q.dmg;e.dotT=180;pop(e,'cursed','#a6e22e')}
-  else{const d=Math.round(q.dmg*(0.9+Math.random()*.2));hurt(e,d);if(f.includes('drain')){const h=Math.max(1,Math.round(d*.3));G.hp=Math.min(S.hpMax,G.hp+h);pop(G.p,'+'+h,'#4caf7d')}}
+  if(q.det&&e.dotT>0){const b=e.dot*Math.ceil(e.dotT/60);e.dotT=0;pop(e,'DETONATE','#ffb020');hurt(e,b);G.shake=Math.max(G.shake,5)}
+  if(q.dot){e.dot=Math.round(q.dmg*affMul(q.el,e));e.dotT=180;pop(e,'cursed','#a6e22e')}
+  else{const m=affMul(q.el,e),d=Math.round(q.dmg*(0.9+Math.random()*.2)*m);if(m>1)pop(e,'WEAK!','#ffd700');else if(m<1)pop(e,'resist','#aaa');hurt(e,d);if(f.includes('drain')){const h=Math.max(1,Math.round(d*.3));G.hp=Math.min(S.hpMax,G.hp+h);pop(G.p,'+'+h,'#4caf7d')}}
   if(f.includes('freeze')){e.frz=120;pop(e,'frozen','#9ee7ff')}else if(f.includes('slow'))e.slw=240;
   const k=f.includes('pull')?-24:f.includes('push')?24:0;if(k){e.x+=dir*k;if(box(e))e.x-=dir*k}}
 
 // ---------- MOVEMENT & BOSSES ----------
-function dash(){if(!G||G.mode!=='fight'||!has('Dash'))return;if(G.dashCd>0||G.mp<8)return;G.mp-=8;G.dashCd=60;G.dashT=10;G.p.inv=Math.max(G.p.inv,14)}
+function dash(){if(!G||G.mode!=='fight'||!has('Dash'))return;if(G.dashCd>0||G.mp<8)return;G.mp-=8;G.dashCd=60;G.dashT=10;sfx('dash');G.p.inv=Math.max(G.p.inv,14)}
 function hitPlayer(a){const p=G.p,b=Math.min(G.sh,a);G.sh-=b;a-=b;if(G.armor&&a){const m=Math.min(Math.floor(G.mp),a);G.mp-=m;a-=m}
-  G.hp-=a;pop(p,a?'-'+a:'blocked',a?'#d9534f':'#4a8fd9');p.inv=40;G.shake=4;burst(p.x+4,p.y+6,'#ff6060',8,1.5)}
+  G.hp-=a;pop(p,a?'-'+a:'blocked',a?'#d9534f':'#4a8fd9');p.inv=40;G.shake=4;sfx('hurt');burst(p.x+4,p.y+6,'#ff6060',8,1.5)}
 const BOSSES=[['Rampaging Golem','charge'],['Hive Mother','summon'],['Cannon Wyrm','shoot'],['Thorn Warden','ward']];
 function bossAI(e){const p=G.p,dx=p.x-e.x,P=e.pat||[];if(Math.abs(dx)>230)return;e.bt++;
-  if(!G.bossSeen){G.bossSeen=1;say(e.name+' appears!')}
+  if(!G.bossSeen){G.bossSeen=1;say(e.name+' appears!');sfx('boss');music('boss')}
   const s=Math.sign(dx)||1;
   if(P.includes('charge')){if(e.bt%180===100&&!e.chg)e.wind=30;
     if(e.wind>0){e.wind--;e.vx=s*.01;if(!e.wind)e.chg=45}else if(e.chg>0){e.chg--;e.vx=s*3.2;G.shake=Math.max(G.shake,1.2);if(!e.chg)e.vx=s*.5}}
@@ -440,6 +445,43 @@ function layer(c,off,base,amp,per,col,k){c.fillStyle=col;for(let x=0;x<W;x+=2){c
   if(k===1){const m=(wx/2|0)%23;if(m<5)h-=9-Math.abs(m-2)*3.5}c.fillRect(x,Math.round(h),2,H-h+10)}}
 function burst(x,y,col,n,sp){for(let i=0;i<n;i++)G.parts.push({x,y,vx:(Math.random()-.5)*2*sp,vy:(Math.random()-.5)*2*sp-.5,l:18+Math.random()*16,c:col,s:Math.random()<.5?1:2,g:.06})}
 function outline(c,a,x,y,s,f){for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])spr(c,a,x+dx,y+dy,{},'#0b0814',s,f)}
+
+// ---------- MAGIC DEPTH ----------
+const FAM={fire:['Fire','Lava','Ash','Star'],water:['Water','Ice','Bubble','Mist','Glass'],nature:['Plant','Earth','Sand','Bone','Poison'],
+  storm:['Lightning','Wind','Storm','Sound'],light:['Light','Moon','Spirit','Crystal'],shadow:['Shadow','Ink','Thread','Gravity','Space','Time','Metal','Paper']};
+const FAMOF=el=>Object.keys(FAM).find(f=>FAM[f].includes(el));
+const BEATS={fire:'nature',nature:'storm',storm:'water',water:'fire',light:'shadow',shadow:'light'};
+const FAMCOL={fire:'#ff6a3d',water:'#3da5ff',nature:'#5fd068',storm:'#ffe14d',light:'#fff3b0',shadow:'#a070ff'};
+function affMul(el,e){const a=FAMOF(el),b=e.fam;if(!a||!b)return 1;if(BEATS[a]===b)return 1.5;if(BEATS[b]===a)return .67;return 1}
+const COMBOS={'dmg>dmg':'Chain Burst','dot>dmg':'Detonation','shield>dmg':'Bulwark Lance','heal>shield':'Sanctuary','dmg>dot':'Deep Curse','shield>heal':'Second Wind','heal>dmg':'Life Spark','dot>dot':'Plague Bloom'};
+const COMBO_INFO={'Chain Burst':'+30% damage','Detonation':'blows up a curse for all its remaining damage','Bulwark Lance':'shot pierces','Sanctuary':'+50% shield','Deep Curse':'2× curse','Second Wind':'+50% heal','Life Spark':'shot drains life','Plague Bloom':'curse splits into 3'};
+const KN={dmg:'Attack',dot:'Curse',shield:'Shield',heal:'Heal'};
+const FUSE={'Fire+Water':'Steam','Fire+Earth':'Magma','Water+Wind':'Tempest','Ice+Lightning':'Frost Storm','Plant+Light':'Bloomlight','Shadow+Fire':'Hellfire','Star+Moon':'Celestial','Sand+Wind':'Dune Storm','Water+Earth':'Mud','Crystal+Light':'Prism'};
+function fuseName(a,b){return (FUSE[a+'+'+b]||FUSE[b+'+'+a]||a+'-'+b)+' Magic'}
+EL_COL.Null='#e8e8e8';
+function upgradeGrimoire(g,r){const v=r();g.marks=v<.015?5:v<.12?4:3;
+  if(r()<.001){g.el='Null';g.name='Null Magic';g.rarity=5;g.marks=5;g.spells=[];return g}
+  if(g.marks===5){const fam=FAMOF(g.el),opts=Object.keys(ELEMENTS).filter(x=>FAMOF(x)!==fam);g.el2=pick(r,opts);
+    g.name=(g.name.replace(/ Magic$/,'').replace(g.el,'').trim()+' '+fuseName(g.el,g.el2)).trim();g.rarity=Math.max(g.rarity,4);
+    const s2=genSpell(r,g.el2,'dmg',g.mult,1);s2.el=g.el2;g.spells.splice(1,1,s2)}
+  const b=1+.06*(g.marks-3);g.mult*=b;g.spells.forEach(s=>s.power=Math.round(s.power*b));return g}
+
+// ---------- SOUND ----------
+let AC=null,muted=false,musT=null,musStep=0,musMode='town';try{muted=localStorage.getItem('mute')==='1'}catch(e){}
+function ac(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume()}catch(e){}return AC}
+function tone(f,d,type,vol,slide){const a=AC;if(!a||muted)return;const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type||'square';o.frequency.setValueAtTime(f,t);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(vol||.06,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d)}
+function noise(d,vol){const a=AC;if(!a||muted)return;const b=a.createBuffer(1,Math.floor(a.sampleRate*d),a.sampleRate),ch=b.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=(Math.random()*2-1)*(1-i/ch.length);
+  const s=a.createBufferSource(),g=a.createGain();g.gain.value=vol||.08;s.buffer=b;s.connect(g);g.connect(a.destination);s.start()}
+const seq=(fs,gap,ty,v)=>fs.forEach((f,i)=>setTimeout(()=>tone(f,.15,ty||'square',v||.05),i*gap));
+const SFX={cast:()=>tone(620,.12,'square',.04,1.9),hit:()=>{noise(.06,.06);tone(200,.07,'square',.04,.5)},kill:()=>{noise(.2,.09);tone(320,.25,'triangle',.07,.3)},
+  jump:()=>tone(280,.12,'square',.035,2),hurt:()=>{tone(150,.25,'sawtooth',.07,.4);noise(.1,.07)},level:()=>seq([523,659,784,1046],90),combo:()=>seq([784,988,1175,1568],55,'triangle',.07),
+  swing:()=>noise(.07,.05),boss:()=>{tone(70,.9,'sawtooth',.09,.5);noise(.4,.06)},pick:()=>seq([880,1320],70,'triangle',.06),dash:()=>tone(520,.12,'sawtooth',.035,.4),win:()=>seq([523,659,784,659,784,1046],110)};
+let sfxT={};function sfx(n){if(!AC||muted)return;const now=performance.now();if(sfxT[n]&&now-sfxT[n]<40)return;sfxT[n]=now;try{SFX[n]()}catch(e){}}
+const SONGS={town:[[0,4,7,4],[5,9,12,9],[7,11,14,11],[0,4,7,12]],fight:[[0,3,7,3],[5,8,12,8],[3,7,10,7],[7,10,14,10]],boss:[[0,1,7,1],[0,3,6,3],[0,1,7,8],[6,3,1,0]]};
+function music(mode){musMode=mode;if(musT)return;musT=setInterval(()=>{if(muted||!AC||document.hidden)return;const s=SONGS[musMode],bar=s[(musStep>>2)%4],n=bar[musStep%4],base=musMode==='town'?220:musMode==='boss'?110:165;
+  tone(base*Math.pow(2,n/12),.17,'triangle',.022);if(musStep%4===0)tone(base/2*Math.pow(2,bar[0]/12),.5,'sine',.035);musStep++},musMode==='boss'?150:190)}
+addEventListener('pointerdown',ac);
 if(S)S.inv=S.inv||{};
 startTown();
 </script></body></html>
